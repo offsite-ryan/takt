@@ -1068,7 +1068,7 @@
       </div>
 
       <div class="help-section">
-        <p class="help-heading">The seven inputs</p>
+        <p class="help-heading">The inputs</p>
         <p class="help-desc">
           The table is split into two groups, same as in the modal itself:
         </p>
@@ -1101,6 +1101,8 @@
           <strong>Revenue ($)</strong> — revenue for the day, used as CoQ's denominator.<br>
           <strong>Assigned To</strong> — who's responsible for this location's plan; free text,
           purely informational and doesn't affect any calculation.<br>
+          <strong>Charge Code</strong> — account, job number, or charge code this day's
+          production ties back to; free text, also purely informational.<br>
           <strong>Priority</strong> — Low/Medium/High/Critical; also informational only.
         </p>
       </div>
@@ -1150,9 +1152,9 @@
       <div class="help-section">
         <p class="help-heading">Today view</p>
         <p class="help-desc">
-          A quick, one-row-per-location table for today only — Planned Time, Assigned, Priority,
-          Up Time, Down Time, and Reason for Downtime. Good Units isn't shown here; it's validated
-          later via the Edit modal.
+          A quick, one-row-per-location table for today only — Planned Time, Assigned, Charge
+          Code, Priority, Up Time, Down Time, and Reason for Downtime. Good Units isn't shown
+          here; it's validated later via the Edit modal.
         </p>
         <p class="help-note">
           Read-only by default and kept current automatically. Click <strong>Edit</strong> to fetch
@@ -1274,6 +1276,11 @@
           every location that belongs to it in one click — a shortcut for the Group filter, not a
           separate calculation.
         </p>
+        <p class="help-note">
+          The area you pick here carries across every section below (Benchmarks, Scrap Reasons,
+          Area Defaults, and Locations) — switch it once and all of them show that same area,
+          rather than picking it separately in each.
+        </p>
       </div>
 
       <div class="help-section">
@@ -1309,8 +1316,10 @@
         <p class="help-desc">
           The urgency levels offered for Priority in the Edit modal and Today view. Unlike scrap
           reasons, this is one shared list rather than per-area, and you can add or remove
-          levels — it isn't fixed at a specific count. Sample data and the default selection
-          both bias toward whichever level sits in the middle of the list.
+          levels — it isn't fixed at a specific count. A brand-new/blank record defaults to
+          whichever level is listed first; generated sample data instead biases toward
+          whichever level sits in the middle of the list, for a more realistic "most days are
+          routine" spread.
         </p>
       </div>
 

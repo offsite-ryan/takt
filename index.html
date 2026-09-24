@@ -93,10 +93,11 @@
     background:var(--c);
     color:#0F1319;
   }
-  /* In Today/Compare, every metric shows at once — clicking a chip wouldn't do anything, so
-     they're muted and made non-interactive rather than implying a selection that has no effect.
-     #metricChipRow itself is display:contents (so it doesn't disturb the surrounding flex row),
-     which means opacity/pointer-events have to target the chips directly, not the wrapper. */
+  /* No longer applied anywhere (Today's chips stay fully readable now that it always runs at the
+     Day timeframe — see render()) — left in place in case a future all-metrics view wants the
+     same "clicking a chip wouldn't do anything, so mute it" treatment. #metricChipRow itself is
+     display:contents (so it doesn't disturb the surrounding flex row), which means
+     opacity/pointer-events have to target the chips directly, not the wrapper. */
   #metricChipRow.chips-muted .chip{
     opacity:.4;
     pointer-events:none;
@@ -1220,7 +1221,7 @@
           <strong>Record shape</strong> (each value in the bulk read's response, and the PATCH body):
         </p>
         <div class="help-formula" style="font-size:12px; text-align:left; white-space:normal;">
-          { planned, downtime, totalUnits, goodUnits, idealCycleTime, coqCost, revenue, scrapReason, scrapReasonText, assigned, priority, metrics, benchmarks }
+          { planned, downtime, totalUnits, goodUnits, idealCycleTime, coqCost, revenue, scrapReason, scrapReasonText, assigned, chargeCode, priority, metrics, benchmarks }
         </div>
         <p class="help-note">
           <strong>metrics</strong> — <code>{ OEE, TEEP, Yield, CoQ }</code> — is computed by TAKT,
@@ -1600,6 +1601,7 @@
                 <th>Location</th>
                 <th style="text-align:right;">Planned Time</th>
                 <th>Assigned</th>
+                <th>Charge Code</th>
                 <th>Priority</th>
                 <th style="text-align:right;">Up Time</th>
                 <th style="text-align:right;">Down Time</th>
@@ -1647,7 +1649,7 @@
       token: "",
       // Record shape (PATCH body, and each value in the bulk read's response — always the
       // COMPLETE record, see DataSource.save, above, for why there's no partial-diff save path):
-      // { planned, downtime, totalUnits, goodUnits, idealCycleTime, coqCost, revenue, scrapReason, scrapReasonText, assigned, priority, metrics, benchmarks }
+      // { planned, downtime, totalUnits, goodUnits, idealCycleTime, coqCost, revenue, scrapReason, scrapReasonText, assigned, chargeCode, priority, metrics, benchmarks }
       // scrapReason is a stable reason CODE (e.g. "T1") that a downstream report can key off
       // permanently. scrapReasonText is a SNAPSHOT of that code's display text at the moment the
       // record was saved (see DEFAULT_SCRAP_REASONS comment) — it's computed by TAKT, like
@@ -2104,7 +2106,10 @@
       const assigned = SAMPLE_ASSIGNEES[Math.floor(rand() * SAMPLE_ASSIGNEES.length)];
       const priority = priorityOpts[weightedPriorityIdxs[Math.floor(rand() * weightedPriorityIdxs.length)]];
 
-      const raw = { planned, downtime, totalUnits, goodUnits, idealCycleTime: targets.idealCycleTime, coqCost, revenue, scrapReason, scrapReasonText, assigned, priority };
+      // Charge Code is a reference value someone types in per assignment, not something sample
+      // generation has a realistic source for — left blank like a real freshly-scheduled record,
+      // same as Assigned/Priority defaulted blank before a scheduler sets them.
+      const raw = { planned, downtime, totalUnits, goodUnits, idealCycleTime: targets.idealCycleTime, coqCost, revenue, scrapReason, scrapReasonText, assigned, chargeCode: "", priority };
       raw.benchmarks = resolveBenchmarksSnapshot(loc); // snapshot, see resolveBenchmarksSnapshot comment above
       raw.metrics = computeMetrics(raw); // computed once, here, same as a real save would — never recomputed later
       return raw;
@@ -2161,7 +2166,7 @@
       return {
         planned, downtime: planned, totalUnits: 0, goodUnits: 0,
         idealCycleTime: targets.idealCycleTime, coqCost: Math.round(targets.coqCost), revenue: Math.round(targets.revenue),
-        scrapReason: "", scrapReasonText: "", assigned: "", priority: priorityOpts[0]
+        scrapReason: "", scrapReasonText: "", assigned: "", chargeCode: "", priority: priorityOpts[0]
       };
     },
 
@@ -2656,6 +2661,9 @@
   let currentMetric = (savedUIState && METRICS[savedUIState.metric]) ? savedUIState.metric : "OEE";
   let currentTf = (savedUIState && TIMEFRAMES[savedUIState.tf]) ? savedUIState.tf : "Day";
   let currentView = (savedUIState && ["trend", "byLocation", "polar", "table", "compare", "today"].includes(savedUIState.view)) ? savedUIState.view : "trend";
+  // Today always runs at the Day timeframe (see setView) — enforce that on a restored session
+  // too, in case saved state from before this rule combined view:"today" with a non-Day tf.
+  if (currentView === "today") currentTf = "Day";
 
   // Current value for a metric under whatever timeframe/view/group is currently selected —
   // shared by the main chart's "Current" stat and the banner chip numbers, so they always agree.
@@ -2952,7 +2960,7 @@
 
     const locs = LOCATIONS.filter(l => selectedLocations.has(l.id));
     if (!locs.length) {
-      tbody.innerHTML = `<tr><td colspan="7" style="color:var(--muted);">No locations selected.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="color:var(--muted);">No locations selected.</td></tr>`;
       return;
     }
 
@@ -2973,6 +2981,7 @@
         <td>${loc.name}</td>
         <td style="text-align:right;"><input type="number" class="today-input" data-field="planned" min="60" max="1440" step="1" value="${record.planned}" ${dis}></td>
         <td><input type="text" class="today-input" data-field="assigned" value="${record.assigned || ""}" placeholder="Unassigned" ${dis}></td>
+        <td><input type="text" class="today-input" data-field="chargeCode" value="${record.chargeCode || ""}" placeholder="—" ${dis}></td>
         <td>
           <select class="today-input" data-field="priority" ${dis}>
             ${PRIORITY_OPTIONS.map(p => `<option value="${p}" ${p === (record.priority || PRIORITY_OPTIONS[0]) ? "selected" : ""}>${p}</option>`).join("")}
@@ -2991,6 +3000,7 @@
       const els = {
         planned: row.querySelector('[data-field="planned"]'),
         assigned: row.querySelector('[data-field="assigned"]'),
+        chargeCode: row.querySelector('[data-field="chargeCode"]'),
         priority: row.querySelector('[data-field="priority"]'),
         upTime: row.querySelector('[data-field="upTime"]'),
         downtime: row.querySelector(".today-downtime"),
@@ -3022,7 +3032,7 @@
 
       els.upTime.addEventListener("change", markDirty);
       els.planned.addEventListener("change", markDirty);
-      [els.assigned, els.priority, els.scrapReason].forEach(el => {
+      [els.assigned, els.chargeCode, els.priority, els.scrapReason].forEach(el => {
         el.addEventListener("change", markDirty);
       });
       stylePrioritySelect(els.priority);
@@ -3043,6 +3053,7 @@
             totalUnits,
             goodUnits,
             assigned: els.assigned.value,
+            chargeCode: els.chargeCode.value,
             priority: els.priority.value,
             scrapReason: els.scrapReason.value
           };
@@ -3102,11 +3113,10 @@
 
   function render() {
     const m = METRICS[currentMetric];
-    // Today still shows every metric at once with no per-metric drill-in, so its chips stay
-    // muted. Compare also shows every metric at once, but clicking a chip there now jumps to
-    // Trend for that metric (see the chip click handler below), so it stays interactive.
-    const isAllMetricsView = currentView === "today";
-    document.getElementById("metricChipRow").classList.toggle("chips-muted", isAllMetricsView);
+    // Today shows every metric at once with no per-metric drill-in, same as Compare — but unlike
+    // the old behavior, the chips stay at full readability rather than dimmed: Today always runs
+    // at the Day timeframe (see setView), so there's nothing timeframe-related to gray out here.
+    document.getElementById("metricChipRow").classList.remove("chips-muted");
     document.getElementById("statRow").style.display = currentView === "today" ? "none" : "";
     document.querySelector(".timeframe-bar").classList.toggle("disabled", currentView === "today");
     document.getElementById("timeframeSelect").disabled = currentView === "today";
@@ -3473,6 +3483,15 @@
 
   function setView(view) {
     currentView = view;
+    if (view === "today") {
+      // Today always shows the current day's data — keep the timeframe state in sync with that
+      // (even though the timeframe bar itself is disabled/hidden for this view in render()), so
+      // switching away and back, or reloading, doesn't leave a stale Week/Month/YTD selection
+      // sitting underneath it.
+      currentTf = "Day";
+      document.querySelectorAll(".timeframe-bar .w3-button").forEach(b => b.classList.toggle("active", b.dataset.tf === "Day"));
+      timeframeSelect.value = "Day";
+    }
     document.querySelectorAll(".view-toggle .w3-button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
     viewSelect.value = view;
     saveUIState();
@@ -3497,8 +3516,12 @@
   const settingsTableBody = document.getElementById("settingsTableBody");
   const dataModeToggle = document.getElementById("dataModeToggle");
   let selectedSettingsLocationId = LOCATIONS[0].id;
+  // Single shared area filter for every per-area Settings section (Manage Locations, Area
+  // Defaults, Benchmarks, Scrap Reasons) — each used to track its own area filter separately, so
+  // switching area in one section left the others showing whatever area they were last on.
+  // switchSettingsArea() (below) is the one place that changes this and keeps every section in
+  // sync with it.
   let settingsAreaFilterId = AREAS[0].id;
-  let benchmarkAreaFilterId = AREAS[0].id;
 
   const SETTINGS_FIELDS = [
     { key: "name",   label: "Location Name", type: "text" },
@@ -3580,7 +3603,7 @@
   // are called both right before switching the filter (so nothing is lost mid-session) and from
   // Save itself (so the area still showing when Save is clicked is captured too).
   function commitAreaDefaultsEdits() {
-    const area = AREAS.find(a => a.id === areaDefaultsFilterId);
+    const area = AREAS.find(a => a.id === settingsAreaFilterId);
     const tbody = document.getElementById("areaDefaultsTableBody");
     if (!area || !tbody) return;
     const newTargets = { ...DEFAULT_LOCATION_TARGETS, ...(area.targets || {}) };
@@ -3597,7 +3620,7 @@
   }
 
   function commitBenchmarkEdits() {
-    const area = AREAS.find(a => a.id === benchmarkAreaFilterId);
+    const area = AREAS.find(a => a.id === settingsAreaFilterId);
     const tbody = document.getElementById("benchmarkTableBody");
     if (!area || !tbody) return;
     area.benchmarks = area.benchmarks || {};
@@ -3609,7 +3632,7 @@
   }
 
   function commitScrapReasonEdits() {
-    const area = AREAS.find(a => a.id === scrapReasonAreaFilterId);
+    const area = AREAS.find(a => a.id === settingsAreaFilterId);
     const tbody = document.getElementById("scrapReasonTableBody");
     if (!area || !tbody) return;
     const updated = DEFAULT_SCRAP_REASONS.map(r => ({ ...r }));
@@ -3626,7 +3649,31 @@
     area.scrapReasons = updated;
   }
 
-  let areaDefaultsFilterId = AREAS[0].id;
+  // The one place settingsAreaFilterId changes — commits whatever's dirty in every per-area
+  // section first (same safety net Save itself uses), then re-renders every section's filter
+  // chips and table against the new area, so all four sections always show the same area.
+  function switchSettingsArea(id) {
+    commitAreaDefaultsEdits();
+    commitBenchmarkEdits();
+    commitScrapReasonEdits();
+    settingsAreaFilterId = id;
+
+    const locsInArea = LOCATIONS.filter(l => l.areaId === settingsAreaFilterId);
+    if (locsInArea.length && !locsInArea.some(l => l.id === selectedSettingsLocationId)) {
+      selectedSettingsLocationId = locsInArea[0].id;
+      populateSettingsTable(selectedSettingsLocationId);
+    }
+
+    renderLocationAreaFilter();
+    renderLocationManageList();
+    renderAreaDefaultsFilter();
+    populateAreaDefaultsTable(settingsAreaFilterId);
+    populateAreaOperatingDays(settingsAreaFilterId);
+    renderBenchmarkAreaFilter();
+    populateBenchmarkTable(settingsAreaFilterId);
+    renderScrapReasonAreaFilter();
+    populateScrapReasonTable(settingsAreaFilterId);
+  }
 
   function renderAreaDefaultsFilter() {
     const filterBar = document.getElementById("areaDefaultsFilter");
@@ -3634,15 +3681,9 @@
     AREAS.forEach(area => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "loc-chip" + (area.id === areaDefaultsFilterId ? " active" : "");
+      btn.className = "loc-chip" + (area.id === settingsAreaFilterId ? " active" : "");
       btn.textContent = area.name;
-      btn.addEventListener("click", () => {
-        commitAreaDefaultsEdits(); // stage the area being left before switching away from it
-        areaDefaultsFilterId = area.id;
-        renderAreaDefaultsFilter();
-        populateAreaDefaultsTable(areaDefaultsFilterId);
-        populateAreaOperatingDays(areaDefaultsFilterId);
-      });
+      btn.addEventListener("click", () => switchSettingsArea(area.id));
       filterBar.appendChild(btn);
     });
   }
@@ -3738,7 +3779,7 @@
     renderBenchmarkAreaFilter();
     renderScrapReasonAreaFilter();
     renderAreaDefaultsFilter();
-    populateAreaOperatingDays(areaDefaultsFilterId);
+    populateAreaOperatingDays(settingsAreaFilterId);
     populateSettingsTable(selectedSettingsLocationId); // new area now selectable
   }
 
@@ -3751,9 +3792,6 @@
     LOCATIONS.forEach(loc => { if (loc.areaId === id) loc.areaId = fallback.id; });
     AREAS.splice(AREAS.findIndex(a => a.id === id), 1);
     if (settingsAreaFilterId === id) settingsAreaFilterId = fallback.id;
-    if (benchmarkAreaFilterId === id) benchmarkAreaFilterId = fallback.id;
-    if (scrapReasonAreaFilterId === id) scrapReasonAreaFilterId = fallback.id;
-    if (areaDefaultsFilterId === id) areaDefaultsFilterId = fallback.id;
     // Its locations just moved to fallback — make sure fallback stays visible in GROUP so they
     // don't silently disappear, and drop the deleted area's now-stale id out of visibleAreaIds.
     if (visibleAreaIds.delete(id)) visibleAreaIds.add(fallback.id);
@@ -3766,9 +3804,12 @@
     renderLocationAreaFilter();
     renderLocationManageList();
     renderBenchmarkAreaFilter();
+    populateBenchmarkTable(settingsAreaFilterId);
     renderScrapReasonAreaFilter();
+    populateScrapReasonTable(settingsAreaFilterId);
     renderAreaDefaultsFilter();
-    populateAreaDefaultsTable(areaDefaultsFilterId);
+    populateAreaDefaultsTable(settingsAreaFilterId);
+    populateAreaOperatingDays(settingsAreaFilterId);
     populateSettingsTable(selectedSettingsLocationId);
   }
 
@@ -3781,16 +3822,7 @@
       btn.type = "button";
       btn.className = "loc-chip" + (area.id === settingsAreaFilterId ? " active" : "");
       btn.textContent = area.name;
-      btn.addEventListener("click", () => {
-        settingsAreaFilterId = area.id;
-        const locsInArea = LOCATIONS.filter(l => l.areaId === settingsAreaFilterId);
-        if (locsInArea.length && !locsInArea.some(l => l.id === selectedSettingsLocationId)) {
-          selectedSettingsLocationId = locsInArea[0].id;
-          populateSettingsTable(selectedSettingsLocationId);
-        }
-        renderLocationAreaFilter();
-        renderLocationManageList();
-      });
+      btn.addEventListener("click", () => switchSettingsArea(area.id));
       filterBar.appendChild(btn);
     });
   }
@@ -3808,14 +3840,9 @@
     AREAS.forEach(area => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "loc-chip" + (area.id === benchmarkAreaFilterId ? " active" : "");
+      btn.className = "loc-chip" + (area.id === settingsAreaFilterId ? " active" : "");
       btn.textContent = area.name;
-      btn.addEventListener("click", () => {
-        commitBenchmarkEdits(); // stage the area being left before switching away from it
-        benchmarkAreaFilterId = area.id;
-        renderBenchmarkAreaFilter();
-        populateBenchmarkTable(benchmarkAreaFilterId);
-      });
+      btn.addEventListener("click", () => switchSettingsArea(area.id));
       filterBar.appendChild(btn);
     });
   }
@@ -3836,22 +3863,15 @@
     });
   }
 
-  let scrapReasonAreaFilterId = AREAS[0].id;
-
   function renderScrapReasonAreaFilter() {
     const filterBar = document.getElementById("scrapReasonAreaFilter");
     filterBar.innerHTML = "";
     AREAS.forEach(area => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "loc-chip" + (area.id === scrapReasonAreaFilterId ? " active" : "");
+      btn.className = "loc-chip" + (area.id === settingsAreaFilterId ? " active" : "");
       btn.textContent = area.name;
-      btn.addEventListener("click", () => {
-        commitScrapReasonEdits(); // stage the area being left before switching away from it
-        scrapReasonAreaFilterId = area.id;
-        renderScrapReasonAreaFilter();
-        populateScrapReasonTable(scrapReasonAreaFilterId);
-      });
+      btn.addEventListener("click", () => switchSettingsArea(area.id));
       filterBar.appendChild(btn);
     });
   }
@@ -3991,22 +4011,19 @@
     settingsApiToken.value = CONFIG.api.token;
     renderAreaManageList();
 
-    benchmarkAreaFilterId = AREAS[0].id;
+    settingsAreaFilterId = AREAS[0].id; // default to the first area every time Settings opens, across every section
     renderBenchmarkAreaFilter();
-    populateBenchmarkTable(benchmarkAreaFilterId);
+    populateBenchmarkTable(settingsAreaFilterId);
 
-    scrapReasonAreaFilterId = AREAS[0].id;
     renderScrapReasonAreaFilter();
-    populateScrapReasonTable(scrapReasonAreaFilterId);
+    populateScrapReasonTable(settingsAreaFilterId);
 
     populatePriorityTable();
 
-    areaDefaultsFilterId = AREAS[0].id;
     renderAreaDefaultsFilter();
-    populateAreaDefaultsTable(areaDefaultsFilterId);
-    populateAreaOperatingDays(areaDefaultsFilterId);
+    populateAreaDefaultsTable(settingsAreaFilterId);
+    populateAreaOperatingDays(settingsAreaFilterId);
 
-    settingsAreaFilterId = AREAS[0].id; // default to the first area every time Settings opens
     const firstInArea = LOCATIONS.find(l => l.areaId === settingsAreaFilterId);
     selectedSettingsLocationId = (firstInArea || LOCATIONS[0]).id;
 
@@ -4355,6 +4372,7 @@
     { key: "coqCost",        label: "Cost of Poor Quality ($)",    step: 10,   min: 0,    max: 1000000, group: "planned" },
     { key: "revenue",        label: "Revenue ($)",                 step: 10,   min: 0,    max: 5000000, group: "planned" },
     { key: "assigned",       label: "Assigned To",                 type: "text", group: "planned" },
+    { key: "chargeCode",     label: "Charge Code",                 type: "text", group: "planned" },
     { key: "priority",       label: "Priority",                    type: "staticSelect", group: "planned" }
   ];
   const FIELD_GROUPS = {

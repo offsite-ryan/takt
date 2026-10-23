@@ -171,6 +171,13 @@
   }
   .loc-chip:hover:not(.active){border-color:var(--muted); color:var(--ink);}
 
+  .area-multi{ order:99; margin-left:auto; display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); cursor:pointer; user-select:none; -webkit-user-select:none; }
+  .area-multi input{ margin:0; cursor:pointer; accent-color:var(--ink); }
+  /* "All" button at the end of the Area and Group chip rows — an action, never highlighted */
+  .all-chip{ border-style:solid; border-color:transparent; background:rgba(255,255,255,.07); color:var(--muted); }
+  .all-chip{ padding:6px 12px; }
+  .all-chip i{ font-size:13px; }
+  .all-chip:hover{ background:rgba(255,255,255,.14); color:var(--ink); border-color:transparent; }
   .area-chip{border-style:dashed;}
   .area-chip.active{border-style:solid;}
 
@@ -430,10 +437,43 @@
      input's own text sits left-aligned inside it regardless of the cell around it, so a
      right-aligned header above a left-aligned input read as mismatched. Left-align header and
      cell for all three instead of fighting the input's natural alignment. */
-  .today-table td:nth-child(2), .today-table th:nth-child(2),
-  .today-table td:nth-child(3), .today-table th:nth-child(3),
-  .today-table td:nth-child(4), .today-table th:nth-child(4){ text-align:left; font-weight:400; }
+  .today-table td[data-col="plan"], .today-table th[data-col="plan"],
+  .today-table td[data-col="done"], .today-table th[data-col="done"],
+  .today-table td[data-col="scrap"], .today-table th[data-col="scrap"],
+  .today-table td[data-col="hourMeter"], .today-table th[data-col="hourMeter"]{ text-align:left; font-weight:400; }
+  .today-table td[data-col="blocked"], .today-table th[data-col="blocked"]{ text-align:center; }
+  /* Breathing room before the Location name, so the orange Blocked bar on the row's left edge doesn't touch it */
+  .today-table td[data-col="location"], .today-table th[data-col="location"]{ padding-left:14px; }
+  /* Custom checkbox (Blocked, in the table and the Edit dialog): rounded box, orange fill + check when on */
+  input.takt-check{
+    -webkit-appearance:none; appearance:none; box-sizing:border-box;
+    width:22px; height:22px; margin:0; padding:0; flex:none;
+    display:inline-grid; place-content:center; vertical-align:middle;
+    border:1.5px solid var(--muted); border-radius:7px; background:transparent;
+    cursor:pointer; transition:background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  input.takt-check::after{
+    content:""; width:11px; height:6px; margin-top:-2px;
+    border:solid #0F1319; border-width:0 0 2.5px 2.5px;
+    transform:rotate(-45deg) scale(0); transition:transform .12s ease;
+  }
+  input.takt-check:checked{ background:#E08A3C; border-color:#E08A3C; }
+  input.takt-check:checked::after{ transform:rotate(-45deg) scale(1); }
+  input.takt-check:hover:not(:disabled){ border-color:var(--ink); box-shadow:0 0 0 3px rgba(224,138,60,.18); }
+  input.takt-check:focus-visible{ outline:2px solid #E08A3C; outline-offset:2px; }
+  input.takt-check:disabled{ cursor:default; border-color:var(--line); }
+  input.takt-check:checked:disabled{ background:#E08A3C; border-color:#E08A3C; opacity:.9; }
   .today-table td, .today-table th{ white-space:nowrap; padding-right:10px; }
+  /* Priority: a pull-down of colored dots (no text) — see renderTodayView / openPrioMenu */
+  .prio-pick{ display:inline-flex; align-items:center; gap:6px; background:transparent; border:1px solid var(--line); border-radius:14px; padding:5px 9px; cursor:pointer; color:var(--muted); font-size:11px; }
+  .prio-pick:hover:not(:disabled){ border-color:var(--muted); }
+  .prio-pick:disabled{ border-color:transparent; padding-left:0; cursor:default; }
+  .prio-pick:disabled i{ display:none; }
+  .today-prio-dot{ flex:none; display:inline-block; width:18px; height:18px; border-radius:50%; background:var(--c); border:2px solid var(--c); }
+  .prio-menu{ position:fixed; z-index:1000; display:none; flex-direction:column; gap:6px; padding:8px; background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,.45); }
+  .prio-menu.open{ display:flex; }
+  .prio-opt{ background:transparent; border:0; padding:3px; border-radius:50%; cursor:pointer; line-height:0; }
+  .prio-opt:hover, .prio-opt.current{ background:rgba(255,255,255,.12); }
   .today-input{
     width:100%;
     min-width:70px;
@@ -448,6 +488,9 @@
   .today-input:disabled{ background:transparent; border-color:transparent; color:var(--ink); opacity:0.85; cursor:default; }
   select.today-input{ min-width:110px; transition:border-color .2s ease, background-color .2s ease; }
   .today-table tr{ transition:background-color .5s ease; }
+  /* Blocked (e.g. "No Material"): orange tint across the row + an orange bar on its left edge */
+  .today-table tr.today-row-blocked{ background-color:color-mix(in srgb, #E08A3C 16%, transparent); }
+  .today-table tr.today-row-blocked td:first-child{ box-shadow:inset 3px 0 0 #E08A3C; }
   .today-table tr.today-row-error{ background-color:color-mix(in srgb, #C96A6A 20%, transparent); }
   .edit-swatch{
     display:inline-block;
@@ -733,6 +776,22 @@
   }
   .view-toggle{margin-top:4px;}
   .view-toggle .w3-button{padding:6px 14px; font-size:12.5px;}
+  /* Today tab + attached calendar button: one pill with a divider, so it reads as a single control.
+     .active (Today view showing) fills the whole pill; .date-shifted (another date picked) turns it amber. */
+  .view-split{ position:relative; display:inline-flex; vertical-align:top; margin-right:8px; border:1px solid var(--line); border-radius:8px; overflow:hidden; transition:all .15s ease; }
+  .view-toggle .view-split .w3-button, .view-toggle .view-split .w3-button.active{ margin-right:0; border:0; border-radius:0; background:transparent; color:var(--muted); }
+  .view-toggle .view-split .view-cal{ padding:6px 12px; border-left:1px solid var(--line); font-size:13px; }
+  .view-toggle .view-split .w3-button:hover{ color:var(--ink); }
+  .view-cal-input{ position:absolute; left:0; bottom:0; width:100%; height:100%; opacity:0; pointer-events:none; border:0; padding:0; }
+  .view-split.active{ background:var(--ink); border-color:var(--ink); }
+  .view-toggle .view-split.active .w3-button{ color:#0F1319; }
+  .view-toggle .view-split.active .view-cal{ border-left-color:rgba(15,19,25,.25); }
+  .view-split.date-shifted{ border-color:#E0A84A; }
+  .view-toggle .view-split.date-shifted .w3-button{ color:#E0A84A; }
+  .view-toggle .view-split.date-shifted .view-cal{ border-left-color:rgba(224,168,74,.45); }
+  .view-split.date-shifted.active{ background:#E0A84A; }
+  .view-toggle .view-split.date-shifted.active .w3-button{ color:#0F1319; }
+  .view-toggle .view-split.date-shifted.active .view-cal{ border-left-color:rgba(15,19,25,.25); }
   .view-toggle-sep{
     display:inline-block;
     vertical-align:middle;
@@ -917,9 +976,102 @@
   }
   ::-webkit-scrollbar-thumb:hover{ background:var(--muted); }
   ::-webkit-scrollbar-corner{ background:transparent; }
+
+  /* ---------- Facility view (native SVG — see FACILITY_LAYOUT and the facility-* functions) ---------- */
+  .facility-grid{ display:grid; grid-template-columns:minmax(0,1fr); gap:16px; align-items:start; } /* side panel removed — a better one is coming later; stage now takes the full width */
+  .facility-stage-col{ min-width:0; display:flex; flex-direction:column; gap:8px; }
+  .facility-stage{
+    --arn:1; position:relative; width:100%; aspect-ratio:var(--arn);
+    background:var(--bg2); border:1px solid var(--line); border-radius:8px; overflow:hidden;
+  }
+  .facility-stage svg{ display:block; width:100%; height:100%; touch-action:none; cursor:grab; user-select:none; -webkit-user-select:none; }
+  .facility-stage svg.dragging{ cursor:grabbing; }
+  .facility-zoomctl{ position:absolute; top:8px; right:8px; display:flex; flex-direction:column; gap:4px; }
+  .facility-zb{
+    min-width:32px; height:32px; padding:0 6px; border:1px solid var(--line);
+    background:var(--panel); color:var(--ink); border-radius:6px; font-weight:600; cursor:pointer;
+  }
+  .facility-stage-foot{ font-size:12px; color:var(--muted); }
+  .facility-tip{
+    position:absolute; pointer-events:none; background:#0b0e12; color:#eef1f3; font:12px/1.4 monospace;
+    padding:4px 8px; border-radius:4px; white-space:nowrap; z-index:3; transform:translate(12px,12px);
+  }
+  .facility-bldg{ fill:var(--bg); stroke:var(--line); stroke-width:1.4; }
+  .facility-bay{ fill:transparent; stroke:var(--line); stroke-width:.6; stroke-dasharray:1.6 1.2; pointer-events:none; }
+  .facility-baylabel{ font:600 10px Arial, sans-serif; fill:var(--muted); pointer-events:none; }
+  .facility-dot{ stroke:var(--bg2); stroke-width:.8; cursor:pointer; }
+  .facility-dot.not-planned{ fill:transparent; stroke:var(--muted); stroke-width:1.2; stroke-dasharray:1.5 1; }
+  .facility-ring{ fill:none; stroke:#fff; stroke-width:1.6; pointer-events:none; }
+  .facility-muted{ color:var(--muted); }
+  .facility-lg{ display:flex; align-items:center; gap:8px; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:12px; }
+  .facility-sw{ width:10px; height:10px; border-radius:50%; flex:none; background:var(--muted); }
+  .facility-sw.not-planned{ background:transparent; border:1.2px dashed var(--muted); }
+  .facility-legend-bar{ display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .facility-legend-bar .facility-lg{ background:var(--panel); }
+  .facility-legend-bar .facility-note{ display:flex; align-items:center; padding:6px 2px; font-size:11px; color:var(--muted); }
+  .facility-selnote{ margin-top:8px; font-size:12px; color:var(--muted); }
+  .facility-selnote strong{ color:var(--ink); font-family:Consolas,'Courier New',monospace; font-weight:600; }
+  @media (max-width:900px){ .facility-grid{ grid-template-columns:minmax(0,1fr); } }
+
+  /* Dev-only generator panel (?generate=true) — never visible without that URL flag. */
+  .gen-panel{ display:none; background:#241b12; border-bottom:2px solid #D98A4A; color:#F5F3EF; padding:12px 20px; font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+  .gen-panel.on{ display:block; }
+  .gen-panel h3{ margin:0 0 4px; font-size:13px; text-transform:uppercase; letter-spacing:.04em; }
+  .gen-panel .gen-note{ font-weight:400; text-transform:none; letter-spacing:0; opacity:.7; font-size:11px; }
+  .gen-panel p{ margin:0 0 10px; opacity:.85; max-width:900px; }
+  .gen-panel .gen-row{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:8px; }
+  .gen-panel textarea{ width:100%; height:140px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:11px; background:#12161C; color:#F5F3EF; border:1px solid #3C4552; border-radius:6px; padding:8px; box-sizing:border-box; }
+  .gen-panel button{ background:#D98A4A; color:#12161C; border:none; border-radius:6px; padding:7px 14px; font-weight:600; cursor:pointer; font-size:12px; }
+  .gen-panel button.secondary{ background:transparent; color:#F5F3EF; border:1px solid #3C4552; }
+  .gen-panel button:disabled{ opacity:.6; cursor:default; }
+  .gen-panel .gen-step-label{ font-size:11px; text-transform:uppercase; letter-spacing:.05em; opacity:.7; margin:14px 0 6px; }
+  .gen-panel .gen-step-label:first-of-type{ margin-top:4px; }
 </style>
 </head>
 <body>
+
+  <!-- Dev-only: generates Areas/Locations straight from FACILITY_LAYOUT. Only ever shown when
+       the URL has ?generate=true (see isGenerateMode()) — invisible in every normal/customer
+       view of this file. -->
+  <div class="gen-panel" id="genPanel">
+    <h3>Facility layout &rarr; Areas/Locations <span class="gen-note">dev tool, visible because the URL has ?generate=true</span></h3>
+    <p>Step 1 loads a facility layout (geometry only — outline + bays) into this running page, so you can see
+      it on the Facility tab before committing to it. Step 2 gives you the matching
+      <code>AREAS</code>/<code>LOCATIONS</code> config to copy onto the real server &mdash; one Area per bay, one
+      Location per cell, using the same defaults (benchmarks, scrap reasons, operating days, targets) the
+      hand-written demo areas use.</p>
+
+    <div class="gen-step-label">Step 1 &mdash; load a layout (optional)</div>
+    <div class="gen-row" style="align-items:flex-start;">
+      <textarea id="genLayoutInput" spellcheck="false" style="height:84px;" placeholder='Paste the builder tool&#8217;s exported JSON here — {"facility": ..., "aspect": ..., "outline": [...], "bays": [...]} — then click Load. Leave this empty to keep using the layout already in this file.'></textarea>
+    </div>
+    <div class="gen-row">
+      <button type="button" id="genLoadLayoutBtn" class="secondary">Load this layout</button>
+      <span class="gen-note" id="genLayoutStatus"></span>
+    </div>
+
+    <div class="gen-step-label">Step 2 &mdash; rename to real codes (optional)</div>
+    <p class="gen-note" style="margin:-4px 0 10px;">One line per bay: bay id or name, a colon, then the real
+      codes in order &mdash; 1st code becomes that bay&rsquo;s cell &ldquo;.01&rdquo;, 2nd becomes &ldquo;.02&rdquo;,
+      and so on (comma, tab, or semicolon between codes &mdash; a <code>TEXTJOIN</code> of one Excel row works
+      directly). A bay left out, or codes short of its full count, just keeps its positional id
+      (<code>B09.02</code>) for whatever&rsquo;s missing.</p>
+    <div class="gen-row" style="align-items:flex-start;">
+      <textarea id="genRenameInput" spellcheck="false" style="height:110px;" placeholder="B01: C001, C002, C003, C004, C005, C006, C007, C008, C009, C010&#10;Bay 2: L201, L202, L203&#10;…"></textarea>
+    </div>
+
+    <div class="gen-step-label">Step 3 &mdash; copy the config for the server</div>
+    <p class="gen-note" style="margin:-4px 0 10px;">Ready-to-paste <code>AREAS</code>/<code>LOCATIONS</code> code
+      for whichever layout is loaded above, with any renames from Step 2 already applied. Paste it into the
+      real config in place of the hardcoded demo arrays.</p>
+    <div class="gen-row">
+      <span class="gen-note" id="genSummary"></span>
+    </div>
+    <div class="gen-row">
+      <button type="button" id="genCopyBtn">Copy code</button>
+    </div>
+    <textarea id="genCode" readonly spellcheck="false"></textarea>
+  </div>
 
   <!-- ===== Banner ===== -->
   <header class="banner">
@@ -956,13 +1108,6 @@
         </div>
         <button class="chip-settings" id="editChip" title="Edit daily data" aria-label="Edit daily data">
           <i class="fa fa-pencil-square-o"></i>
-        </button>
-        <!-- Separate from Edit on purpose, not just a shortcut into it — this is the entry point
-             for pre-assigning upcoming work (Priority/Assigned/Plan), a scheduler-type
-             task rather than an operator recording today's actuals. Kept as its own button so it
-             can be shown/hidden by role later without touching Edit's own visibility. -->
-        <button class="chip-settings" id="scheduleChip" title="Schedule upcoming work" aria-label="Schedule upcoming work">
-          <i class="fa fa-calendar-plus-o"></i>
         </button>
         <button class="chip-settings" id="settingsChip" title="Settings" aria-label="Settings">
           <i class="fa fa-cog"></i>
@@ -1153,8 +1298,9 @@
           <strong>Locations / Overview</strong> — Best Location and Worst Location (with their
           values), Spread (the gap between them), and On Target (how many locations are
           currently at or beyond the benchmark).<br>
+          <!-- Table view hidden for now (see HIDDEN_VIEWS): restore with the view.
           <strong>Table</strong> — Net Change from the first period shown to the last, and On
-          Target (how many periods were at or beyond the benchmark).<br>
+          Target (how many periods were at or beyond the benchmark).<br> -->
           <strong>Compare</strong> — Needs Attention (whichever of the four metrics has the
           biggest gap from its own target right now) and On Target (how many of the four metrics
           are currently meeting theirs).<br>
@@ -1183,16 +1329,14 @@
       <div class="help-panel" id="helpPanelEdit" style="display:none;">
 
       <div class="help-section">
-        <p class="help-heading">Edit vs. Schedule</p>
+        <p class="help-heading">Edit vs. scheduling ahead</p>
         <p class="help-desc">
-          Two buttons open this same dialog, for two different jobs. <strong>Edit</strong>
-          (pencil icon) records what already happened — its date picker only reaches back
-          through the last 14 days and never forward past today. <strong>Schedule</strong>
-          (calendar icon) assigns upcoming work ahead of time — its date picker only reaches
-          forward, from today through <span id="helpScheduleLookahead"></span> days out, and
-          never into the past. Both open the exact same fields; which ones you actually see
-          depends on the date you land on, not which button you clicked — see "Scheduling
-          ahead," below.
+          <strong>Edit</strong> (pencil icon) records what already happened — its date picker
+          reaches back through the last 14 days and never forward past today. To assign upcoming
+          work, use the <strong>calendar button next to Today</strong>: pick a date up to
+          <span id="helpScheduleLookahead"></span> days out (or a past day) and the Today table
+          shows that date — see "Scheduling ahead," below. Click the date on the tab to come back
+          to today.
         </p>
       </div>
 
@@ -1221,7 +1365,14 @@
           Settings, for whenever Done fell short of Plan or there was scrap — context only, it
           doesn't feed any calculation. What gets saved is a stable code (e.g. "T1"), not the
           text you see in the dropdown — so renaming a reason's wording in Settings later doesn't
-          disconnect it from records already saved against it.
+          disconnect it from records already saved against it.<br>
+          <strong>Hour Meter</strong> — the reading on the equipment's own hour meter. A plain
+          number with no calculation attached; leave it blank if it wasn't read (blank is not the
+          same as 0). It exists so what's reported can be checked against the physical meter at
+          the location — trust, but verify.<br>
+          <strong>Blocked</strong> — tick it when the location can't run (for example, no
+          material). Its row gets an orange tint. It's saved with that day's record, so a new day
+          always starts unblocked again.
         </p>
         <p class="help-desc">
           <strong>Planned / Target</strong> — set periodically, usually by planning or finance
@@ -1249,12 +1400,12 @@
       <div class="help-section">
         <p class="help-heading">Scheduling ahead</p>
         <p class="help-desc">
-          Pick a date later than today (only reachable via Schedule) and <strong>Daily
-          Actuals</strong> disappears entirely — there's nothing to observe yet on a day that
-          hasn't happened. Only <strong>Planned / Target</strong> shows, which is exactly where
-          Assigned and Priority live, so a scheduler can staff out upcoming days without
-          touching anything an operator would later record. Once that date arrives, the Today
-          view shows whatever was assigned automatically — no extra step needed.
+          Pick a future date with the calendar button next to Today and the table opens up
+          <strong>Plan, Assigned, Charge Code and Priority</strong> for editing, while
+          <strong>Done, Scrap and Scrap Reason</strong> stay locked — there's nothing to observe
+          yet on a day that hasn't happened. Click Edit, make your changes, then Done Editing to
+          save. Once that date arrives, the Today view shows whatever was assigned automatically —
+          no extra step needed.
         </p>
       </div>
 
@@ -1291,11 +1442,25 @@
       <div class="help-section">
         <p class="help-heading">Today view</p>
         <p class="help-desc">
-          A quick, one-row-per-location table for today only — Plan, Done, Scrap, Assigned,
-          Charge Code, Priority, and Reason are editable here; Delta is shown alongside them as a
-          read-only read-out (max(0, Plan − Done), in this location's own unit — hours or units)
-          that updates live as you type Plan or Done. It's the same figure this app calls Down
-          Time elsewhere — "Delta" is just a label that also makes sense for a qty location.
+          A quick, one-row-per-location table for a single day — today by default. Blocked, Plan,
+          Done, Scrap, Hour Meter, Assigned, Charge Code, Priority, $ / Per and Reason are
+          editable here; Delta is shown alongside as a read-only read-out (max(0, Plan − Done), in
+          this location's own unit — hours or units) that updates live as you type Plan or Done.
+          It's the same figure this app calls Down Time elsewhere — "Delta" is just a label that
+          also makes sense for a qty location.
+        </p>
+        <p class="help-desc" style="margin-top:8px;">
+          <strong>Other dates:</strong> the calendar button next to the Today tab opens a date
+          picker — back through the last 14 days, or ahead for scheduling. The tab then shows that
+          date in amber; click it to return to today. For a future date, Done, Scrap, Hour Meter,
+          Blocked and Reason stay locked (there's nothing to observe yet).
+        </p>
+        <p class="help-desc" style="margin-top:8px;">
+          <strong>Priority</strong> is a colored dot; while editing, click it to pick from a
+          pull-down of dots (stop-light colors, low to critical — hover a dot for its name).
+          <strong>Blocked</strong> is a checkbox that tints the whole row orange. On tablets and
+          phones some columns are hidden to fit the screen (which ones is a site setting); every
+          field is still editable from the Edit (pencil) dialog.
         </p>
         <p class="help-note">
           Read-only by default and kept current automatically. Click <strong>Edit</strong> to fetch
@@ -1304,9 +1469,10 @@
           touched in one batch (one save per changed row, not per field).
         </p>
         <p class="help-note" style="margin-top:8px;">
-          If a row fails to save, it's flagged red and stays editable — the table won't drop back
-          to read-only until every changed row has saved successfully. Click Done Editing again to
-          retry just the rows still outstanding.
+          If a row fails to save, it's flagged red, keeps what you typed, and the line above the
+          table says why (for example, that the server couldn't be reached). The table won't drop
+          back to read-only until every changed row has saved — click Done Editing again to retry
+          just the rows still outstanding.
         </p>
         <p class="help-note" style="margin-top:8px;">
           Saving here recomputes that location's OEE/Yield/CoQ/Delta from whatever Plan, Done, and
@@ -1363,7 +1529,7 @@
           <strong>Record shape</strong> (each value in the bulk read's response, and the PATCH body):
         </p>
         <div class="help-formula" style="font-size:12px; text-align:left; white-space:normal;">
-          { plan, done, scrap, dollarPer, scrapReason, scrapReasonText, assigned, chargeCode, priority, metrics: { OEE, Units, Delta, Yield, CoQ }, benchmarks }
+          { plan, done, scrap, hourMeter, blocked, dollarPer, scrapReason, scrapReasonText, assigned, chargeCode, priority, metrics: { OEE, Units, Delta, Yield, CoQ }, benchmarks }
         </div>
         <p class="help-note">
           <strong>plan</strong>, <strong>done</strong>, and <strong>scrap</strong> are always in
@@ -1371,6 +1537,13 @@
           area (Settings &gt; Areas &gt; Type) — and TAKT never converts between the two. The Today
           view's "Delta" column and Good aren't sent at all; they're derived (max(0, plan − done)
           and done − scrap) and recomputed on read, never stored.
+        </p>
+        <p class="help-note">
+          <strong>hourMeter</strong> is a number (or <code>null</code> when not entered) — the
+          equipment's own hour-meter reading, stored as-is with no logic applied, so it can be
+          checked against the physical meter. <strong>blocked</strong> is <code>true</code> or
+          <code>false</code> for that day (a record without the field counts as not blocked); an
+          automated process can set it by saving the complete record with it changed.
         </p>
         <p class="help-note">
           <strong>metrics</strong> — <code>{ OEE, Units, Delta, Yield, CoQ }</code> — is computed by
@@ -1422,9 +1595,13 @@
         <p class="help-heading">Areas</p>
         <p class="help-desc">
           A grouping layer above locations. Add or delete areas here, and reassign a location to a
-          different area from its Area field below. On the main screen, clicking an area chip selects
-          every location that belongs to it in one click — a shortcut for the Group filter, not a
-          separate calculation.
+          different area from its Area field below. On the main screen, clicking an area chip shows
+          just that area, with all of its locations selected, in one click. Tick the
+          <strong>Multi-select</strong> box at the right of the Area row to click several areas
+          and show them together; the <strong>All</strong> button (checked-box icon) shows every
+          area. The Group row works the same way for individual locations, with its own
+          Multi-select box and All button. These are shortcuts for the Group filter, not a separate
+          calculation.
         </p>
         <p class="help-desc">
           Each area also has a <strong>Type</strong> — Hours or Units — set from the toggle in the
@@ -1721,7 +1898,7 @@
   <div class="wrap">
     <div class="panel">
 
-      <div class="w3-row-padding" style="align-items:center;">
+      <div class="w3-row-padding" id="metricHeaderRow" style="align-items:center;">
         <div class="w3-col m7">
           <p class="metric-title" id="metricTitle">Overall Equipment Effectiveness</p>
           <p class="metric-sub" id="metricSub">Simplified OEE</p>
@@ -1740,13 +1917,19 @@
       <div class="w3-row-padding view-toggle-row" style="align-items:center; margin-top:16px;">
         <div class="w3-col m12" style="text-align:right;">
           <div class="view-toggle w3-bar">
-            <button class="w3-button" data-view="today"><i class="fa fa-list" style="margin-right:6px;"></i>Today</button>
+            <span class="view-split" id="todaySplit">
+              <button class="w3-button" data-view="today" id="todayTab" title="Today"><i class="fa fa-list" style="margin-right:6px;"></i><span id="todayTabLabel">Today</span></button>
+              <button type="button" class="w3-button view-cal" id="todayCalBtn" aria-label="Pick a date" title="View or schedule another date"><i class="fa fa-calendar"></i></button>
+              <input type="date" id="todayDateInput" class="view-cal-input" tabindex="-1" aria-hidden="true">
+            </span>
             <button class="w3-button" data-view="compare"><i class="fa fa-th-large" style="margin-right:6px;"></i>Compare</button>
             <span class="view-toggle-sep"></span>
             <button class="w3-button" data-view="trend"><i class="fa fa-line-chart" style="margin-right:6px;"></i>Trend</button>
             <button class="w3-button" data-view="byLocation"><i class="fa fa-bar-chart" style="margin-right:6px;"></i>Locations</button>
             <button class="w3-button" data-view="polar"><i class="fa fa-pie-chart" style="margin-right:6px;"></i>Overview</button>
             <button class="w3-button" data-view="table"><i class="fa fa-table" style="margin-right:6px;"></i>Table</button>
+            <span class="view-toggle-sep" id="facTabSep"></span>
+            <button class="w3-button" id="facTab" data-view="facility"><i class="fa fa-map" style="margin-right:6px;"></i>Facility</button>
           </div>
         </div>
       </div>
@@ -1766,15 +1949,18 @@
           <option value="byLocation">Locations</option>
           <option value="polar">Overview</option>
           <option value="table">Table</option>
+          <option value="facility" id="facOption">Facility</option>
         </select>
       </div>
 
       <div id="areaBar" class="location-bar">
         <span class="location-label">Area:</span>
+        <label class="area-multi" title="Off: clicking an area shows just that area. On: click several areas to show them together."><input type="checkbox" id="areaMulti"> Multi-select</label>
       </div>
 
       <div id="locationBar" class="location-bar">
         <span class="location-label">Group:</span>
+        <label class="area-multi" title="Off: clicking a location shows just that location. On: click several locations to show them together."><input type="checkbox" id="locMulti"> Multi-select</label>
       </div>
 
       <!-- Phone-only: replaces the two rows above with a single button that opens a checklist -->
@@ -1813,20 +1999,55 @@
           <table class="data-table today-table">
             <thead>
               <tr>
-                <th>Location</th>
-                <th>Plan</th>
-                <th>Done</th>
-                <th>Scrap</th>
-                <th>Assigned</th>
-                <th>Charge Code</th>
-                <th>Priority</th>
-                <th style="text-align:right;">Delta</th>
-                <th>Reason</th>
+                <th data-col="location">Location</th>
+                <th data-col="blocked">Blocked</th>
+                <th data-col="plan">Plan</th>
+                <th data-col="done">Done</th>
+                <th data-col="scrap">Scrap</th>
+                <th data-col="hourMeter">Hour Meter</th>
+                <th data-col="assigned">Assigned</th>
+                <th data-col="chargeCode">Charge Code</th>
+                <th data-col="priority">Priority</th>
+                <th data-col="dollarPer">$ / Per</th>
+                <th data-col="delta" style="text-align:right;">Delta</th>
+                <th data-col="reason">Reason</th>
               </tr>
             </thead>
             <tbody id="todayTableBody"></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- Facility view: rendered natively in TAKT's own SVG, directly from FACILITY_LAYOUT
+           (geometry only — outline + bays, no naming/location logic; see the constant's own
+           comment). No iframe, no embedded second app — this is TAKT's DOM, TAKT's CSS
+           variables, TAKT's own click/hover handling. Dot priority-color + has-data fill are
+           MOCK data for now (seedFacilityMock()) until the real Location-mapping layer and
+           live status feed are designed; nothing here is wired to real Plan/Done/Priority yet. -->
+      <div id="facilityWrap" style="display:none; margin-top:10px;">
+        <div class="facility-grid">
+          <div class="facility-stage-col">
+            <div class="facility-stage" id="facilityStage">
+              <svg id="facilitySvg" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Facility floor plan with one status dot per test cell">
+                <g id="facGBldg"></g>
+                <g id="facGBays"></g>
+                <g id="facGCells"></g>
+                <g id="facGOver"></g>
+              </svg>
+              <div class="facility-zoomctl">
+                <button class="facility-zb" id="facZIn" type="button" aria-label="Zoom in">+</button>
+                <button class="facility-zb" id="facZOut" type="button" aria-label="Zoom out">&minus;</button>
+                <button class="facility-zb" id="facZFit" type="button" aria-label="Fit plan to view">Fit</button>
+              </div>
+              <div class="facility-tip" id="facTip" hidden></div>
+            </div>
+            <div class="facility-stage-foot">
+              <span id="facHint">Scroll to zoom &middot; drag to pan &middot; click a dot for details</span>
+            </div>
+          </div>
+        </div>
+        <div class="facility-legend-bar" id="facLegendBar"></div>
+        <div class="facility-selnote" id="facSelNote">Click a dot on the plan for details.</div>
       </div>
 
       <div class="stat-row" id="statRow"></div>
@@ -1849,7 +2070,7 @@
   // Bumped by hand each time this file is snapshotted to STABLE (see the export filename,
   // takt-demo-STABLE-vNNN.html) — never inferred from anything else. Shown in the footer so a
   // deployed instance can always be matched back to the file it came from.
-  const VERSION = "v106";
+  const VERSION = "v149";
   document.getElementById("versionLabel").textContent = VERSION;
 
   // ==========================================================================================
@@ -1873,7 +2094,7 @@
       token: "",
       // Record shape (PATCH body, and each value in the bulk read's response — always the
       // COMPLETE record, see DataSource.save, above, for why there's no partial-diff save path):
-      // { plan, done, scrap, dollarPer, scrapReason, scrapReasonText, assigned, chargeCode, priority, metrics, benchmarks }
+      // { plan, done, scrap, hourMeter, blocked, dollarPer, scrapReason, scrapReasonText, assigned, chargeCode, priority, metrics, benchmarks }
       // scrapReason is a stable reason CODE (e.g. "T1") that a downstream report can key off
       // permanently. scrapReasonText is a SNAPSHOT of that code's display text at the moment the
       // record was saved (see DEFAULT_SCRAP_REASONS comment) — it's computed by TAKT, like
@@ -1994,14 +2215,90 @@
   // and its own checkbox row stays disabled, by explicit design (not a real use case there).
   const OPERATING_DAYS_DEFAULT = [true, true, true, true, true, true, true];
 
+  // =====================================================================================
+  // SITE CONFIG — the three constants below are what changes per site/customer: the facility
+  // floor plan, the Areas, and the Locations. Everything above (defaults, metrics) and below
+  // (logic) is generic.
+  // =====================================================================================
+
+  // ---------- Facility layout (exported from the standalone facility-builder tool) ----------
+  // Geometry ONLY — outline + bays, deliberately no naming/location logic (that was tried and
+  // deliberately unwound: the builder stays "dumb" about identity, TAKT owns Location mapping,
+  // same reasoning as why color logic isn't synced from another app). Every cell gets a plain
+  // positional id, bayId + ".NN" (e.g. "B09.02") — purely "2nd dot in Bay 9", never a claim
+  // about which real TAKT Location it is. A real Location-mapping layer (positional id -> real
+  // Location code) and a live status feed are still future work; until then, seedFacilityMock()
+  // below fabricates plausible Priority/has-data state per cell just so this renders with
+  // something to look at. aspect = image width / height, used to size the SVG viewBox; outline
+  // is one or more polygon rings, each a list of [x,y] fractions of that aspect box; each bay's
+  // x1/y1/x2/y2 are also fractions of the same box, count is how many cells it holds, rows is
+  // an explicit row count or 0 to auto-pick one (see gridFor, below).
+  // Set to null to turn the Facility view off entirely — the Facility tab (and its separator) are
+  // hidden and no floor plan is built. To enable it, replace null with a layout object shaped like
+  // the example below (a builder export).
+  const FACILITY_LAYOUT = null;
+
+  // Example (what a layout looks like — paste a builder export over `null` above to use it):
+  // const FACILITY_LAYOUT = {
+  //   "facility": "Sample Facility", // real facility name withheld from this generic/customer-facing file — only the traced outline shape ships here
+  //   "aspect": 1.8012,
+  //   "outline": [
+  //     [[0.0488, 0.9391], [0.5818, 0.9336], [0.5742, 0.1318], [0.0548, 0.1345]]
+  //   ],
+  //   "bays": [
+  //     // { "id": "B03", "name": "Bay 3", "x1": 0.0808, "y1": 0.5456, "x2": 0.2396, "y2": 0.6282, "count": 4, "rows": 0 },
+  //     // { "id": "B04", "name": "Bay 4", "x1": 0.2834, "y1": 0.5463, "x2": 0.4591, "y2": 0.6254, "count": 4, "rows": 0 },
+  //     // { "id": "B07", "name": "Bay 7", "x1": 0.0708, "y1": 0.1798, "x2": 0.5394, "y2": 0.26, "count": 7, "rows": 0 },
+  //     // { "id": "B09", "name": "Bay 9", "x1": 0.0746, "y1": 0.3548, "x2": 0.4531, "y2": 0.44, "count": 7, "rows": 0 },
+  //     // { "id": "B12", "name": "Bay 12", "x1": 0.0809, "y1": 0.8382, "x2": 0.55, "y2": 0.9146, "count": 7, "rows": 0 }
+  //   ],
+  //   "api": { "url": "", "pollSeconds": 5 }
+  // };
+
   const AREAS = [
-    { id: "na",    name: "North America", type: "hrs", benchmarks: { ...DEFAULT_BENCHMARKS }, scrapReasons: DEFAULT_SCRAP_REASONS.map(r => ({ ...r })),
+    {
+      id: "na", name: "North America", type: "hrs", benchmarks: { ...DEFAULT_BENCHMARKS }, scrapReasons: DEFAULT_SCRAP_REASONS.map(r => ({ ...r })),
       targets: { plan: 8, dollarPer: 1000 },
-      operatingDays: [...OPERATING_DAYS_DEFAULT] },
-    { id: "latam", name: "Latin America", type: "qty", benchmarks: { ...DEFAULT_BENCHMARKS }, scrapReasons: DEFAULT_SCRAP_REASONS.map(r => ({ ...r })),
+      operatingDays: [...OPERATING_DAYS_DEFAULT]
+    },
+    {
+      id: "latam", name: "Latin America", type: "qty", benchmarks: { ...DEFAULT_BENCHMARKS }, scrapReasons: DEFAULT_SCRAP_REASONS.map(r => ({ ...r })),
       targets: { plan: 225, dollarPer: 10 },
-      operatingDays: [...OPERATING_DAYS_DEFAULT] }
+      operatingDays: [...OPERATING_DAYS_DEFAULT]
+    },
+    {
+      id: "comp", name: "Components", type: "qty", benchmarks: { ...DEFAULT_BENCHMARKS }, scrapReasons: DEFAULT_SCRAP_REASONS.map(r => ({ ...r })),
+      targets: { plan: 225, dollarPer: 10 },
+      operatingDays: [...OPERATING_DAYS_DEFAULT]
+    }
   ];
+
+  // A location is just a name inside an area now — no numeric fields of its own. Its daily
+  // numbers come from its area's targets (see getLocationTargets below) until a specific date
+  // is edited, at which point that date's saved record takes over for good.
+  const LOCATIONS = [
+    { id: "line1", name: "L001", areaId: "na" },
+    { id: "line2", name: "L002", areaId: "na" },
+    { id: "line3", name: "M003", areaId: "latam" },
+    { id: "C001", name: "C001", areaId: "comp" },
+    { id: "C002", name: "C002", areaId: "comp" },
+    { id: "C003", name: "C003", areaId: "comp" },
+    { id: "GH23", name: "GH23", areaId: "comp" }
+  ];
+
+  // ---------- Today table: columns hidden on smaller screens ----------
+  // Which Today-table columns to hide on tablet / phone widths (desktop always shows everything).
+  // Column keys: blocked, plan, done, scrap, hourMeter, assigned, chargeCode, priority, dollarPer, delta, reason.
+  // (Location is always shown.) Widths are max-width breakpoints in px. A phone is also narrower
+  // than the tablet cutoff, so everything in `tablet` is hidden on phones too — `phone` only needs
+  // the EXTRA columns to drop there. Hidden columns are only hidden from view: their values are
+  // untouched, and every field stays editable in the Edit (pencil) dialog.
+  const TODAY_TABLE_HIDE = {
+    tabletMaxWidth: 1024,
+    phoneMaxWidth: 700,
+    tablet: ["chargeCode", "dollarPer"],
+    phone:  ["assigned", "delta"]
+  };
 
   // Resolves a scrap-reason code to its CURRENT display text, via the location's area — called
   // only at the moment a record is generated or saved (sample generation, DataSource.save), so
@@ -2065,15 +2362,6 @@
     const area = AREAS.find(a => a.id === (loc && loc.areaId));
     return (area && (area.type === "qty" ? "qty" : "hrs")) || "hrs";
   }
-
-  // A location is just a name inside an area now — no numeric fields of its own. Its daily
-  // numbers come from its area's targets (see getLocationTargets above) until a specific date
-  // is edited, at which point that date's saved record takes over for good.
-  const LOCATIONS = [
-    { id: "line1", name: "L001", areaId: "na" },
-    { id: "line2", name: "L002", areaId: "na" },
-    { id: "line3", name: "M003", areaId: "latam" }
-  ];
 
   // Every place locations are listed (GROUP chips, dropdowns, popovers) just iterates LOCATIONS
   // in its current array order — sorting the array itself once, here, keeps all of them
@@ -2278,7 +2566,9 @@
         tf: currentTf,
         view: currentView,
         locations: Array.from(selectedLocations),
-        visibleAreas: Array.from(visibleAreaIds)
+        visibleAreas: Array.from(visibleAreaIds),
+        areaMulti: areaMulti,
+        locMulti: locMulti
       }));
     } catch (e) {
       console.warn("Could not save selections:", e);
@@ -2402,7 +2692,9 @@
       const priorityOpts = PRIORITY_OPTIONS.length ? PRIORITY_OPTIONS : DEFAULT_PRIORITY_OPTIONS;
       return {
         plan: targets.plan, done: 0, scrap: 0, dollarPer: targets.dollarPer,
-        scrapReason: "", scrapReasonText: "", assigned: "", chargeCode: "", priority: priorityOpts[0]
+        scrapReason: "", scrapReasonText: "", assigned: "", chargeCode: "", priority: priorityOpts[0],
+        hourMeter: null, // equipment hour-meter reading (plain number, no logic) — a "trust but verify" check against the real meter
+        blocked: false // set per day (e.g. "No Material"); a new day's record starts unblocked, so it clears itself
       };
     },
 
@@ -2637,6 +2929,15 @@
   const visibleAreaIds = new Set(
     validSavedAreas.length ? validSavedAreas : AREAS.map(a => a.id)
   );
+
+  // Area-row "Multi-select" checkbox. Off (default): clicking an Area chip shows ONLY that area —
+  // one click to jump between areas, which is what a kiosk or a quick look wants. On: area chips
+  // toggle independently, so several areas can be shown together (the previous behavior).
+  // Persisted with the other selections.
+  let areaMulti = !!(savedUIState && savedUIState.areaMulti);
+  // Same idea for the GROUP row's location chips: off (default) = clicking a location shows just
+  // that one; on = chips toggle independently so several can be shown together. Persisted too.
+  let locMulti = !!(savedUIState && savedUIState.locMulti);
 
   // ISO-8601 week number (Mon–Sun weeks, week 1 = the week containing the year's first
   // Thursday) — the convention manufacturing customers actually track against, not just
@@ -2911,7 +3212,15 @@
   let compareCharts = { OEE: null, Yield: null, CoQ: null, Delta: null }; // Compare view's mini-charts
   let currentMetric = (savedUIState && METRICS[savedUIState.metric]) ? savedUIState.metric : "OEE";
   let currentTf = (savedUIState && TIMEFRAMES[savedUIState.tf]) ? savedUIState.tf : "Day";
-  let currentView = (savedUIState && ["trend", "byLocation", "polar", "table", "compare", "today"].includes(savedUIState.view)) ? savedUIState.view : "trend";
+  // Views hidden from the UI for now (button + phone dropdown entry) — their code is all still
+  // here, untouched. To bring one back, just remove it from this list. A saved session that was
+  // last on a hidden view falls back to Trend instead of landing on something unreachable.
+  const HIDDEN_VIEWS = ["table"];
+  document.querySelectorAll(".view-toggle [data-view], #viewSelect option").forEach(el => {
+    const v = el.dataset.view || el.value;
+    if (HIDDEN_VIEWS.includes(v)) { el.hidden = true; el.style.display = "none"; el.disabled = true; }
+  });
+  let currentView = (savedUIState && ["trend", "byLocation", "polar", "table", "compare", "today", ...(FACILITY_LAYOUT ? ["facility"] : [])].filter(v => !HIDDEN_VIEWS.includes(v)).includes(savedUIState.view)) ? savedUIState.view : "trend";
   // Today always runs at the Day timeframe (see setView) — enforce that on a restored session
   // too, in case saved state from before this rule combined view:"today" with a non-Day tf.
   if (currentView === "today") currentTf = "Day";
@@ -3186,6 +3495,19 @@
   let todayEditMode = false;
   let todayDirtyLocations = new Set();  // locationIds with unsaved edits this session
   let todayFailedLocations = new Set(); // subset of the above whose last save attempt failed
+  // What was typed into a row whose save failed, kept so the re-render doesn't wipe it (the table
+  // re-renders from stored records, which a failed save never updated), plus why it failed.
+  let todayPending = new Map();         // locationId -> the merged record that failed to save
+  let todayFailMsg = new Map();         // locationId -> short human-readable reason
+
+  // Turns a thrown save error into something readable in the status line.
+  function describeSaveError(err) {
+    if (CONFIG.dataMode === "api" && location.protocol === "file:") {
+      return "can't reach the server from a file:// page — API mode needs the app served by a web server (check Settings > Data source)";
+    }
+    if (err && err.name === "TypeError") return "couldn't reach the server";
+    return (err && err.message) ? "server said " + err.message : "unknown error";
+  }
   let todayRowHandles = [];             // rebuilt each render; read by the Done-Editing flush
 
   // Fetches the latest record for each of these locations on `dateStr` and updates rawStore.
@@ -3205,9 +3527,99 @@
     }));
   }
 
+  // Shared pop-up for the Today table's priority dots: one dot per priority option, no text (the
+  // stop-light colors carry the meaning; names are in each dot's tooltip/aria-label). Picking one
+  // sets the row's hidden <select> and fires its change event.
+  let prioMenuEl = null, prioMenuAnchor = null;
+  function closePrioMenu() { if (prioMenuEl) prioMenuEl.classList.remove("open"); prioMenuAnchor = null; }
+  // Puts the menu under its dot (or above it when there's no room below). Re-run on scroll/resize
+  // so the menu follows the dot — e.g. when the table scrolls sideways on a narrow screen, which
+  // also happens just from tapping a dot that's partly off-screen.
+  function placePrioMenu() {
+    if (!prioMenuEl || !prioMenuAnchor) return;
+    const r = prioMenuAnchor.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight || r.right < 0 || r.left > window.innerWidth) { closePrioMenu(); return; }
+    prioMenuEl.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 60)) + "px";
+    prioMenuEl.style.top = (r.bottom + 4) + "px";
+    const mh = prioMenuEl.offsetHeight;
+    if (r.bottom + 4 + mh > window.innerHeight - 4) prioMenuEl.style.top = Math.max(4, r.top - mh - 4) + "px";
+  }
+  function openPrioMenu(btn, selectEl) {
+    if (!prioMenuEl) {
+      prioMenuEl = document.createElement("div");
+      prioMenuEl.className = "prio-menu";
+      prioMenuEl.setAttribute("role", "listbox");
+      document.body.appendChild(prioMenuEl);
+      document.addEventListener("click", closePrioMenu);
+      document.addEventListener("keydown", e => { if (e.key === "Escape") closePrioMenu(); });
+      window.addEventListener("resize", placePrioMenu);
+      window.addEventListener("scroll", placePrioMenu, true);
+    }
+    prioMenuEl.innerHTML = "";
+    PRIORITY_OPTIONS.forEach(name => {
+      const opt = document.createElement("button");
+      opt.type = "button";
+      opt.className = "prio-opt" + (name === selectEl.value ? " current" : "");
+      opt.title = name;
+      opt.setAttribute("role", "option");
+      opt.setAttribute("aria-label", name);
+      opt.innerHTML = '<span class="today-prio-dot" style="--c:' + priorityColorFor(name) + '"></span>';
+      opt.addEventListener("click", () => {
+        selectEl.value = name;
+        selectEl.dispatchEvent(new Event("change"));
+        closePrioMenu();
+      });
+      prioMenuEl.appendChild(opt);
+    });
+    prioMenuAnchor = btn;
+    prioMenuEl.classList.add("open");
+    placePrioMenu();
+  }
+
+  // Builds the responsive column-hiding rules from TODAY_TABLE_HIDE (site config) once at startup.
+  // Table min-width is dropped at those widths too, so the table actually shrinks to fit the
+  // remaining columns instead of keeping its wide desktop minimum and scrolling sideways.
+  (function injectTodayColumnRules() {
+    const sel = keys => keys.map(k => '.today-table [data-col="' + k + '"]').join(",");
+    let css = "";
+    [["tabletMaxWidth", "tablet"], ["phoneMaxWidth", "phone"]].forEach(([w, list]) => {
+      const keys = (TODAY_TABLE_HIDE[list] || []).filter(k => k !== "location");
+      if (!keys.length) return;
+      css += "@media (max-width:" + TODAY_TABLE_HIDE[w] + "px){" + sel(keys) + "{display:none;} .today-table{min-width:0;}}\n";
+    });
+    if (!css) return;
+    const st = document.createElement("style");
+    st.textContent = css;
+    document.head.appendChild(st);
+  })();
+
+  // Which date the Today view is showing. null = the real current day (the default, and what the
+  // tab's "Today" label means). Set from the calendar button next to the Today tab; not persisted,
+  // so a reload always lands back on today.
+  let todayViewDate = null;
+  function todayViewDateStr() { return todayViewDate || dailyDates[dailyDates.length - 1]; }
+  function todayViewIsFuture() { return todayViewDateStr() > isoDate(new Date()); }
+
+  // Tab label: "Today", or the picked date in an accent color so it's obvious you're not on today.
+  function updateTodayTabLabel() {
+    const shifted = !!todayViewDate;
+    document.getElementById("todayTabLabel").textContent = shifted
+      ? new Date(todayViewDate + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })
+      : "Today";
+    document.getElementById("todayTab").title = shifted ? "Back to today" : "Today";
+    document.getElementById("todayTab").classList.toggle("date-shifted", shifted);
+    const split = document.getElementById("todaySplit");
+    split.classList.toggle("date-shifted", shifted);
+    split.classList.toggle("active", currentView === "today");
+  }
+  function todayBlockedNotice() {
+    document.getElementById("todayEditStatus").textContent = "Click Done Editing before changing the date";
+  }
+
   function renderTodayView() {
     document.getElementById("todayWrap").style.display = "block";
-    const todayDate = dailyDates[dailyDates.length - 1];
+    const todayDate = todayViewDateStr();
+    const isFuture = todayViewIsFuture();
     const tbody = document.getElementById("todayTableBody");
     tbody.innerHTML = "";
     todayRowHandles = [];
@@ -3217,13 +3629,14 @@
     toggleBtn.textContent = todayEditMode ? "Done Editing" : "Edit";
     statusEl.textContent = todayEditMode
       ? (todayFailedLocations.size
-          ? `${todayFailedLocations.size} row${todayFailedLocations.size === 1 ? "" : "s"} didn't save — fix and click Done Editing again`
+          ? `${todayFailedLocations.size} row${todayFailedLocations.size === 1 ? "" : "s"} didn't save (${[...todayFailMsg.values()][0] || "unknown error"}) — your entries are kept; click Done Editing to retry`
           : "Editing — auto-refresh paused")
-      : "Read-only — refreshes automatically";
+      : (isFuture ? "Scheduling ahead — Done and Scrap open up once the day arrives"
+        : todayViewDate ? "Read-only" : "Read-only — refreshes automatically");
 
     const locs = LOCATIONS.filter(l => selectedLocations.has(l.id));
     if (!locs.length) {
-      tbody.innerHTML = `<tr><td colspan="9" style="color:var(--muted);">No locations selected.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" style="color:var(--muted);">No locations selected.</td></tr>`;
       return;
     }
 
@@ -3231,37 +3644,44 @@
       // A null here means the API genuinely has no record for this location/day yet — fall
       // back to a blank, editable record rather than skipping the row, so today's numbers can
       // still be entered for the first time.
-      const record = (rawStore[loc.id] && rawStore[loc.id][todayDate]) || DataSource.blankRecord(loc, todayDate);
+      const record = (todayEditMode && todayPending.get(loc.id)) // typed values from a save that failed — don't lose them
+        || (rawStore[loc.id] && rawStore[loc.id][todayDate]) || DataSource.blankRecord(loc, todayDate);
 
       const area = AREAS.find(a => a.id === loc.areaId);
       const reasons = (area && Array.isArray(area.scrapReasons) && area.scrapReasons.length === 5) ? area.scrapReasons : DEFAULT_SCRAP_REASONS;
       const dis = todayEditMode ? "" : "disabled";
+      const disActual = (todayEditMode && !isFuture) ? "" : "disabled"; // nothing to record yet on a future day
       const locType = getAreaType(loc);
       const planField = PLAN_FIELD_BY_TYPE[locType];
       const delta = round1(Math.max(0, (record.plan || 0) - (record.done || 0)));
 
       const row = document.createElement("tr");
       if (todayFailedLocations.has(loc.id)) row.classList.add("today-row-error");
+      if (record.blocked) row.classList.add("today-row-blocked");
       row.innerHTML = `
-        <td>
+        <td data-col="location">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="display:inline-block; min-width:5ch;">${loc.name}</span>
             <span class="type-badge ${locType}">${locType === "qty" ? "Units" : "Hours"}</span>
           </div>
         </td>
-        <td><input type="number" class="today-input" data-field="plan" min="${planField.min}" max="${planField.max}" step="${planField.step}" value="${record.plan}" ${dis}></td>
-        <td><input type="number" class="today-input" data-field="done" min="0" max="100000" step="1" value="${record.done || 0}" ${dis}></td>
-        <td><input type="number" class="today-input" data-field="scrap" min="0" max="100000" step="1" value="${record.scrap || 0}" ${dis}></td>
-        <td><input type="text" class="today-input" data-field="assigned" value="${record.assigned || ""}" placeholder="Unassigned" ${dis}></td>
-        <td><input type="text" class="today-input" data-field="chargeCode" value="${record.chargeCode || ""}" placeholder="—" ${dis}></td>
-        <td>
-          <select class="today-input" data-field="priority" ${dis}>
+        <td data-col="blocked"><input type="checkbox" class="takt-check" data-field="blocked" aria-label="Blocked" ${record.blocked ? "checked" : ""} ${disActual}></td>
+        <td data-col="plan"><input type="number" class="today-input" data-field="plan" min="${planField.min}" max="${planField.max}" step="${planField.step}" value="${record.plan}" ${dis}></td>
+        <td data-col="done"><input type="number" class="today-input" data-field="done" min="0" max="100000" step="1" value="${record.done || 0}" ${disActual}></td>
+        <td data-col="scrap"><input type="number" class="today-input" data-field="scrap" min="0" max="100000" step="1" value="${record.scrap || 0}" ${disActual}></td>
+        <td data-col="hourMeter"><input type="number" class="today-input" data-field="hourMeter" min="0" max="100000000" step="0.1" value="${record.hourMeter == null ? "" : record.hourMeter}" placeholder="—" ${disActual}></td>
+        <td data-col="assigned"><input type="text" class="today-input" data-field="assigned" value="${record.assigned || ""}" placeholder="Unassigned" ${dis}></td>
+        <td data-col="chargeCode"><input type="text" class="today-input" data-field="chargeCode" value="${record.chargeCode || ""}" placeholder="—" ${dis}></td>
+        <td data-col="priority">
+          <button type="button" class="prio-pick" data-role="prioPick" ${dis}><span class="today-prio-dot"></span><i class="fa fa-caret-down"></i></button>
+          <select class="today-input" data-field="priority" style="display:none;" ${dis}>
             ${PRIORITY_OPTIONS.map(p => `<option value="${p}" ${p === (record.priority || PRIORITY_OPTIONS[0]) ? "selected" : ""}>${p}</option>`).join("")}
           </select>
         </td>
-        <td style="text-align:right; color:var(--muted);" data-role="delta">${delta}</td>
-        <td>
-          <select class="today-input" data-field="scrapReason" ${dis}>
+        <td data-col="dollarPer"><input type="number" class="today-input" data-field="dollarPer" min="0" max="1000000" step="10" value="${record.dollarPer || 0}" ${dis}></td>
+        <td data-col="delta" style="text-align:right; color:var(--muted);" data-role="delta">${delta}</td>
+        <td data-col="reason">
+          <select class="today-input" data-field="scrapReason" ${disActual}>
             <option value="">— none —</option>
             ${reasons.map(r => `<option value="${r.code}" ${r.code === record.scrapReason ? "selected" : ""}>${r.text}</option>`).join("")}
           </select>
@@ -3275,6 +3695,9 @@
         assigned: row.querySelector('[data-field="assigned"]'),
         chargeCode: row.querySelector('[data-field="chargeCode"]'),
         priority: row.querySelector('[data-field="priority"]'),
+        dollarPer: row.querySelector('[data-field="dollarPer"]'),
+        blocked: row.querySelector('[data-field="blocked"]'),
+        hourMeter: row.querySelector('[data-field="hourMeter"]'),
         scrapReason: row.querySelector('[data-field="scrapReason"]'),
         deltaCell: row.querySelector('[data-role="delta"]')
       };
@@ -3283,11 +3706,27 @@
         todayDirtyLocations.add(loc.id);
       }
 
-      [els.plan, els.done, els.scrap, els.assigned, els.chargeCode, els.priority, els.scrapReason].forEach(el => {
+      [els.plan, els.done, els.scrap, els.assigned, els.chargeCode, els.priority, els.dollarPer, els.blocked, els.hourMeter, els.scrapReason].forEach(el => {
         el.addEventListener("change", markDirty);
       });
+      els.blocked.addEventListener("change", () => row.classList.toggle("today-row-blocked", els.blocked.checked));
       stylePrioritySelect(els.priority);
       els.priority.addEventListener("change", () => stylePrioritySelect(els.priority));
+
+      // Priority is shown as a pull-down of colored dots only (no text). The real <select> stays in
+      // the row, hidden, as the single source of truth — the dot button just mirrors it and, via
+      // the shared menu (openPrioMenu), sets it and fires its change event, so dirty-tracking and
+      // saving keep working through the one existing path.
+      const prioBtn = row.querySelector('[data-role="prioPick"]');
+      const prioDot = prioBtn.querySelector(".today-prio-dot");
+      function refreshPrioDot() {
+        prioDot.style.setProperty("--c", priorityColorFor(els.priority.value));
+        prioBtn.setAttribute("aria-label", "Priority: " + els.priority.value);
+        prioBtn.title = "Priority: " + els.priority.value;
+      }
+      refreshPrioDot();
+      els.priority.addEventListener("change", refreshPrioDot);
+      prioBtn.addEventListener("click", (e) => { e.stopPropagation(); openPrioMenu(prioBtn, els.priority); });
 
       // "Delta" here is just a type-neutral label for the same shortfall figure this app has
       // always tracked as Down Time (max(0, Plan − Done), in this location's own unit — hours or
@@ -3317,6 +3756,11 @@
             assigned: els.assigned.value,
             chargeCode: els.chargeCode.value,
             priority: els.priority.value,
+            dollarPer: Math.max(0, parseFloat(els.dollarPer.value) || 0),
+            blocked: els.blocked.checked,
+            // Hour Meter is a plain reading with no logic attached — blank stays blank (null), so
+            // "not entered" is never confused with a real 0.
+            hourMeter: els.hourMeter.value === "" ? null : Math.max(0, parseFloat(els.hourMeter.value) || 0),
             scrapReason: els.scrapReason.value
           };
         }
@@ -3330,7 +3774,7 @@
   // and the table stays in edit mode rather than locking, so nothing gets silently lost.
   document.getElementById("todayEditToggle").addEventListener("click", async () => {
     const toggleBtn = document.getElementById("todayEditToggle");
-    const todayDate = dailyDates[dailyDates.length - 1];
+    const todayDate = todayViewDateStr();
 
     if (todayEditMode) {
       const dirtyHandles = todayRowHandles.filter(h => todayDirtyLocations.has(h.loc.id));
@@ -3348,9 +3792,13 @@
           await DataSource.save(h.loc.id, todayDate, merged);
           todayDirtyLocations.delete(h.loc.id);
           todayFailedLocations.delete(h.loc.id);
+          todayPending.delete(h.loc.id);
+          todayFailMsg.delete(h.loc.id);
         } catch (err) {
           console.warn(`Save failed for ${h.loc.name}:`, err);
           todayFailedLocations.add(h.loc.id);
+          todayPending.set(h.loc.id, merged);
+          todayFailMsg.set(h.loc.id, describeSaveError(err));
         }
       }));
       toggleBtn.disabled = false;
@@ -3368,12 +3816,349 @@
       toggleBtn.disabled = false;
       todayDirtyLocations = new Set();
       todayFailedLocations = new Set();
+      todayPending = new Map();
+      todayFailMsg = new Map();
       todayEditMode = true;
       renderTodayView();
     }
   });
 
+  // ---------- Facility: native SVG renderer ----------
+  // Geometry comes straight from FACILITY_LAYOUT (outline + bays). Dot color (Priority) and fill
+  // (has-data) are MOCK state from seedFacilityMock() — the demo's Location registry doesn't have
+  // real records for all ~195 cells this layout implies, and the real positional-id -> Location
+  // mapping + live status feed are deferred work (see FACILITY_LAYOUT's own comment above).
+  // Working copy of the layout every facility-* function reads. FACILITY_LAYOUT (site config,
+  // above) may be null = Facility turned off; an empty stand-in keeps the shared geometry code
+  // simple, and facEnabled is what actually gates the tab/view. The ?generate=true import can
+  // swap a layout in later (replaceFacilityLayout), which also turns the tab on.
+  const FACILITY_EMPTY = { facility: "(none)", aspect: 1, outline: [], bays: [], api: { url: "", pollSeconds: 5 } };
+  let facLayout = FACILITY_LAYOUT || FACILITY_EMPTY;
+  let facEnabled = !!FACILITY_LAYOUT;
+  const facImg = { w: 1000, h: Math.round(1000 / (facLayout.aspect || 1)) };
+  let facView = { x: 0, y: 0, w: facImg.w, h: facImg.h };
+  // Visual aspect ratio actually used for the stage's CSS box and the SVG viewBox. Starts equal
+  // to FACILITY_LAYOUT.aspect but gets replaced with the real content bounding box's aspect once
+  // geometry loads (facBuildGeometryAndData) — a layout's declared `aspect` is the shape of the
+  // builder's reference image, which can have margins the traced building doesn't fill, so using
+  // it verbatim for the visible box re-creates the exact dead space facFitView is trying to remove.
+  let facAspect = facImg.w / facImg.h;
+  let facCells = [], facCellMap = new Map(), facMock = new Map(), facSelId = null, facHoverId = null, facDrag = null, facBuilt = false;
+  // Positional cell id -> real code, kept live by the ?generate=true Step 2 box (empty/unused
+  // outside generate mode). Read by facHover/facSelect so the floor plan's own tooltip and
+  // selection panel show whatever you just typed, not just the positional placeholder — the
+  // rename box otherwise only ever fed the copy-paste code, never anything on screen.
+  let facRenameMap = new Map();
+  function facLabel(id) { return facRenameMap.get(id) || id; }
+
+  function facEl(tag, attrs, parent) {
+    const n = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function facPad2(n) { return String(n).padStart(2, "0"); }
+  function facClamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+  function facEsc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  const facBayRect = b => ({ x: b.x1 * facImg.w, y: b.y1 * facImg.h, w: (b.x2 - b.x1) * facImg.w, h: (b.y2 - b.y1) * facImg.h });
+
+  // Bounding box (in facImg pixel space) of the actual outline+bay geometry. This can be smaller
+  // than the full facImg.w x facImg.h canvas when a traced layout doesn't reach every edge of its
+  // own declared aspect box (e.g. the builder's reference image had margin/legend space the real
+  // building didn't occupy). Fitting to this instead of the full canvas is what makes "Fit" (and
+  // the initial view) hug the actual floor plan rather than leaving dead space around it.
+  function facContentBounds() {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const add = (x, y) => { if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y; };
+    for (const ring of facLayout.outline) for (const p of ring) add(p[0] * facImg.w, p[1] * facImg.h);
+    for (const b of facLayout.bays) { const r = facBayRect(b); add(r.x, r.y); add(r.x + r.w, r.y + r.h); }
+    if (!isFinite(minX)) return { x: 0, y: 0, w: facImg.w, h: facImg.h }; // no geometry at all -> fall back to the full canvas
+    return { x: minX, y: minY, w: Math.max(1, maxX - minX), h: Math.max(1, maxY - minY) };
+  }
+
+  // Sets facAspect to the content bounding box's own aspect ratio (so the stage's CSS box and the
+  // SVG's viewBox are shaped like the actual building, not the builder's nominal reference-image
+  // aspect), then fits facView to that bounding box plus a small margin. Used for the initial view
+  // on a fresh layout and for the "Fit" button.
+  function facFitView() {
+    const b = facContentBounds(), m = Math.max(b.w, b.h) * 0.08;
+    facAspect = b.w / b.h || (facImg.w / facImg.h);
+    document.getElementById("facilityStage").style.setProperty("--arn", facAspect);
+    facView = { x: b.x - m, y: b.y - m, w: b.w + m * 2, h: b.h + m * 2 };
+    facSetView();
+  }
+
+  // Lays out b.count dots in an auto-picked rows x cols grid inside the bay's rect (reused as-is
+  // from the standalone facility-builder tool's own grid math) unless the bay names an explicit
+  // row count. Cell ids are purely positional ("B09.02" = 2nd dot in Bay 9) — see FACILITY_LAYOUT.
+  function facGridFor(b) {
+    const r = facBayRect(b), p = Math.min(6, r.w * .06, r.h * .2);
+    const iw = Math.max(1, r.w - 2 * p), ih = Math.max(1, r.h - 2 * p), n = Math.max(0, b.count | 0);
+    let rows = b.rows > 0 ? b.rows : 0;
+    if (!rows) {
+      let best = 1, bs = Infinity;
+      for (let k = 1; k <= Math.min(8, n || 1); k++) {
+        const c = Math.ceil(n / k), s = Math.abs(Math.log((iw / c) / (ih / k)));
+        if (s < bs) { bs = s; best = k; }
+      }
+      rows = best;
+    }
+    const cols = Math.max(1, Math.ceil(n / rows)), pts = [];
+    for (let i = 0; i < n; i++) {
+      pts.push({ x: r.x + p + (i % cols + .5) * iw / cols, y: r.y + p + (Math.floor(i / cols) + .5) * ih / rows });
+    }
+    return pts;
+  }
+  function facComputeCells() {
+    facCells = []; facCellMap.clear();
+    for (const b of facLayout.bays) {
+      facGridFor(b).forEach((pt, i) => {
+        const id = b.id + "." + facPad2(i + 1);
+        const c = { id, bayId: b.id, x: pt.x, y: pt.y };
+        facCells.push(c); facCellMap.set(id, c);
+      });
+    }
+  }
+
+  // Fabricates plausible per-cell Priority + has-data state with a tiny seeded PRNG (not Math.random,
+  // so the floor plan looks the same on every reload instead of reshuffling) purely so the renderer
+  // has something to show. None of this is real Plan/Done/Priority data — see the comment above.
+  function seedFacilityMock() {
+    facMock.clear();
+    let seed = 7919;
+    const rand = () => { seed = (seed * 48271) % 2147483647; return seed / 2147483647; };
+    for (const c of facCells) {
+      if (rand() < 0.12) { facMock.set(c.id, { planned: false, hasData: false, priority: null }); continue; }
+      facMock.set(c.id, { planned: true, hasData: rand() < 0.7, priority: Math.min(3, Math.floor(rand() * 4)) });
+    }
+  }
+
+  function facBuildStatic() {
+    const gBldg = document.getElementById("facGBldg"), gBays = document.getElementById("facGBays");
+    gBldg.textContent = ""; gBays.textContent = "";
+    for (const ring of facLayout.outline) {
+      facEl("polygon", { class: "facility-bldg", points: ring.map(p => (p[0] * facImg.w).toFixed(2) + "," + (p[1] * facImg.h).toFixed(2)).join(" ") }, gBldg);
+    }
+    for (const b of facLayout.bays) {
+      const r = facBayRect(b);
+      facEl("rect", { class: "facility-bay", x: r.x, y: r.y, width: r.w, height: r.h }, gBays);
+      const label = facEl("text", { class: "facility-baylabel", x: r.x + 4, y: Math.max(12, r.y - 6) }, gBays);
+      label.textContent = b.name;
+    }
+  }
+
+  // Dot encoding (final, per the hand-drawn legend): outline color = Priority, reusing TAKT's own
+  // PRIORITY_COLORS/PRIORITY_OPTIONS so this never drifts from the rest of the app. Fill = solid
+  // when today's Done has been reported, hollow when not. No Plan today at all -> .not-planned
+  // (muted/dashed), which the scheduler needs to be able to spot at a glance.
+  function facDotColor(st) { return (!st || !st.planned) ? null : (PRIORITY_COLORS[st.priority] || PRIORITY_COLORS[0]); }
+
+  function facBuildCells() {
+    const gCells = document.getElementById("facGCells");
+    gCells.textContent = "";
+    for (const c of facCells) {
+      const st = facMock.get(c.id), notPlanned = !st || !st.planned, color = facDotColor(st);
+      const dot = facEl("circle", { class: "facility-dot" + (notPlanned ? " not-planned" : ""), cx: c.x, cy: c.y, r: 6, "data-id": c.id }, gCells);
+      if (!notPlanned) { dot.style.stroke = color; dot.style.fill = st.hasData ? color : "transparent"; }
+    }
+  }
+
+  function facSetView() {
+    facView.w = facClamp(facView.w, facImg.w / 12, facImg.w);
+    facView.h = facView.w / facAspect;
+    facView.x = facClamp(facView.x, 0, facImg.w - facView.w);
+    facView.y = facClamp(facView.y, 0, facImg.h - facView.h);
+    document.getElementById("facilitySvg").setAttribute("viewBox", facView.x + " " + facView.y + " " + facView.w + " " + facView.h);
+  }
+  function facToImg(e) {
+    const svg = document.getElementById("facilitySvg");
+    const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return { x: p.x, y: p.y };
+  }
+  function facZoomAt(p, f) {
+    const nw = facClamp(facView.w * f, facImg.w / 12, facImg.w), k = nw / facView.w;
+    facView.x = p.x - (p.x - facView.x) * k;
+    facView.y = p.y - (p.y - facView.y) * k;
+    facView.w = nw;
+    facSetView();
+  }
+  function facLegend() {
+    // Horizontal strip under the floor-plan card explaining the dot encoding: outline = Priority
+    // (reuses TAKT's own PRIORITY_COLORS/PRIORITY_OPTIONS), fill = has today's data, dashed/muted
+    // outline = not planned at all. The rest of the old side panel (summary/bays list/selected-
+    // cell) was pulled and isn't rebuilt yet.
+    const box = document.getElementById("facLegendBar");
+    if (!box) return;
+    let html = "";
+    for (let i = 0; i < PRIORITY_COLORS.length; i++) {
+      html += '<div class="facility-lg"><span class="facility-sw" style="background:' + PRIORITY_COLORS[i] + '"></span>' + facEsc(PRIORITY_OPTIONS[i] || ("Priority " + (i + 1))) + "</div>";
+    }
+    html += '<div class="facility-lg"><span class="facility-sw not-planned"></span>Not planned</div>';
+    html += '<div class="facility-note">Filled dot = has today&rsquo;s data &middot; hollow = no data yet</div>';
+    box.innerHTML = html;
+  }
+
+  // One-line readout under the legend (#facSelNote) — replaces the old side-panel "selected
+  // cell" card that was pulled in v110 (a fuller replacement is still TBD). Also still draws the
+  // selection ring right on the plan, same as before.
+  function facSelect(id) {
+    facSelId = id;
+    document.querySelectorAll("#facGCells .facility-dot").forEach(d => d.classList.toggle("sel", d.dataset.id === id));
+    const over = document.getElementById("facGOver");
+    over.textContent = "";
+    const note = document.getElementById("facSelNote");
+    if (!id || !facCellMap.has(id)) {
+      if (note) note.textContent = "Click a dot on the plan for details.";
+      return;
+    }
+    const c = facCellMap.get(id);
+    facEl("circle", { cx: c.x, cy: c.y, r: 10, class: "facility-ring" }, over);
+    if (!note) return;
+    const st = facMock.get(id) || {};
+    const b = facLayout.bays.find(x => x.id === c.bayId);
+    const priLabel = st.planned ? (PRIORITY_OPTIONS[st.priority] || "—") : "Not planned";
+    const label = facLabel(id);
+    note.innerHTML = "<strong>" + facEsc(label) + "</strong>" + (label !== id ? " (" + facEsc(id) + ")" : "")
+      + " — " + facEsc(b ? b.name : "") + " · " + facEsc(priLabel)
+      + (st.planned ? " · " + (st.hasData ? "has data today" : "no data yet") : "");
+  }
+
+  function facHover(e) {
+    const tip = document.getElementById("facTip");
+    const t = e.target.closest && e.target.closest("[data-id]");
+    if (!t) { tip.hidden = true; facHoverId = null; return; }
+    const id = t.dataset.id;
+    if (id !== facHoverId) {
+      const st = facMock.get(id) || {};
+      tip.textContent = facLabel(id) + " · " + (st.planned ? (PRIORITY_OPTIONS[st.priority] || "—") : "Not planned");
+      facHoverId = id;
+    }
+    const r = document.getElementById("facilityStage").getBoundingClientRect();
+    tip.style.left = (e.clientX - r.left) + "px";
+    tip.style.top = (e.clientY - r.top) + "px";
+    tip.hidden = false;
+  }
+
+  function facWireEvents() {
+    const svg = document.getElementById("facilitySvg");
+    svg.addEventListener("pointerdown", e => {
+      if (e.button !== 0) return;
+      const cellEl = e.target.closest && e.target.closest("[data-id]");
+      svg.setPointerCapture(e.pointerId);
+      facDrag = { sx: e.clientX, sy: e.clientY, vx: facView.x, vy: facView.y, s: svg.getScreenCTM().a, moved: false, cell: cellEl ? cellEl.dataset.id : null };
+    });
+    svg.addEventListener("pointermove", e => {
+      if (!facDrag) { facHover(e); return; }
+      const dx = e.clientX - facDrag.sx, dy = e.clientY - facDrag.sy;
+      if (Math.abs(dx) + Math.abs(dy) > 3) facDrag.moved = true;
+      if (facDrag.moved) { facView.x = facDrag.vx - dx / facDrag.s; facView.y = facDrag.vy - dy / facDrag.s; facSetView(); }
+    });
+    function endDrag(e) {
+      if (!facDrag) return;
+      const d = facDrag; facDrag = null;
+      try { svg.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (!d.moved) facSelect(d.cell || null);
+    }
+    svg.addEventListener("pointerup", endDrag);
+    svg.addEventListener("pointercancel", endDrag);
+    svg.addEventListener("pointerleave", () => { if (!facDrag) { document.getElementById("facTip").hidden = true; facHoverId = null; } });
+    svg.addEventListener("wheel", e => { e.preventDefault(); facZoomAt(facToImg(e), e.deltaY < 0 ? .8 : 1.25); }, { passive: false });
+    document.getElementById("facZIn").onclick = () => facZoomAt({ x: facView.x + facView.w / 2, y: facView.y + facView.h / 2 }, .7);
+    document.getElementById("facZOut").onclick = () => facZoomAt({ x: facView.x + facView.w / 2, y: facView.y + facView.h / 2 }, 1 / .7);
+    document.getElementById("facZFit").onclick = () => facFitView();
+  }
+
+  // Rebuilds the floor plan from whatever FACILITY_LAYOUT currently holds — split out from
+  // initFacility so a layout swap (see replaceFacilityLayout, the ?generate=true import) can
+  // re-run just this part without double-binding the pointer/zoom listeners, which only ever
+  // need to be attached once to the SVG's persistent DOM nodes.
+  function facBuildGeometryAndData() {
+    document.getElementById("facilitySvg").setAttribute("viewBox", "0 0 " + facImg.w + " " + facImg.h);
+    facComputeCells();
+    seedFacilityMock();
+    facBuildStatic();
+    facBuildCells();
+    facLegend();
+    facSelect(null);
+    // --arn (the stage's CSS aspect-ratio) and the SVG viewBox are both set inside facFitView, from
+    // the actual content bounding box — not FACILITY_LAYOUT.aspect, which is the builder's nominal
+    // reference-image shape and can have margins the traced building doesn't fill. Using the real
+    // content's own aspect here is what actually removes dead space (an earlier fix set --arn from
+    // FACILITY_LAYOUT.aspect directly, which looked right for the stage's outer box shape but just
+    // reintroduced the same margin inside the viewBox once Fit forced that same nominal aspect).
+    facFitView();
+  }
+
+  // Built once, the first time the Facility tab is opened — geometry rebuilds on every layout
+  // swap (facBuildGeometryAndData), but listeners don't need to run again on every tab switch
+  // (same reasoning as the old initFacilityFrame's one-time load).
+  function initFacility() {
+    if (facBuilt) return;
+    facBuilt = true;
+    facBuildGeometryAndData();
+    facWireEvents();
+  }
+
+  // Swaps in a different facility layout at runtime — used only by the ?generate=true import box,
+  // so someone can paste a fresh export from the builder tool and see it without round-tripping
+  // through a file edit. Swaps the working layout (facLayout) and enables the Facility tab.
+  function replaceFacilityLayout(newLayout) {
+    facLayout = newLayout;
+    facEnabled = true;
+    applyFacilityVisibility();
+    facImg.w = 1000;
+    facImg.h = Math.round(1000 / (facLayout.aspect || 1));
+    if (facBuilt) facBuildGeometryAndData(); // already opened once this session — rebuild in place now
+    // else: nothing to rebuild yet — initFacility() will build correctly, with this layout, the
+    // first time the Facility tab is actually opened.
+  }
+
+  // Shows/hides the Facility tab, its separator, and the phone dropdown entry based on facEnabled
+  // (i.e. whether FACILITY_LAYOUT is set).
+  function applyFacilityVisibility() {
+    ["facTabSep", "facTab"].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = facEnabled ? "" : "none"; });
+    const opt = document.getElementById("facOption"); if (opt) opt.hidden = !facEnabled;
+  }
+
+  // Facility is the odd one out among views: it isn't a metric view at all, just its own native
+  // SVG render (see the facilityWrap comment above), so it hides everything metric-related
+  // instead of swapping between them the way table/compare/today do. Called at the top of every
+  // render() so switching away from Facility always restores the normal chrome correctly, not
+  // just switching into it.
+  function setFacilityMode(on) {
+    document.getElementById("facilityWrap").style.display = on ? "" : "none";
+    document.getElementById("metricHeaderRow").style.display = on ? "none" : "";
+    // #metricChipRow relies on display:contents (set inline in markup) to flatten into its
+    // parent's flex row — "" would fall back to the element's normal block default instead of
+    // restoring that, so the off-case has to name it explicitly.
+    document.getElementById("metricChipRow").style.display = on ? "none" : "contents";
+    document.getElementById("areaBar").style.display = on ? "none" : "";
+    document.getElementById("locationBar").style.display = on ? "none" : "";
+    document.querySelector(".mobile-locations-trigger").style.display = on ? "none" : "";
+    // Facility is its own standalone view, not something layered below whichever other view
+    // happened to be active last — render() returns early for it (see below) so none of the
+    // normal per-view branches run to hide these on the way in; they're never explicitly shown
+    // back on the way out either, since leaving Facility always goes through a normal render()
+    // for whatever view comes next, and that branch sets each of these correctly on its own.
+    if (on) {
+      document.getElementById("statRow").style.display = "none";
+      document.getElementById("chart").style.display = "none";
+      document.getElementById("dataTableWrap").style.display = "none";
+      document.getElementById("compareWrap").style.display = "none";
+      document.getElementById("todayWrap").style.display = "none";
+      initFacility();
+    }
+  }
+
+  applyFacilityVisibility();
+
   function render() {
+    updateTodayTabLabel();
+    setFacilityMode(currentView === "facility");
+    if (currentView === "facility") return;
+
     const m = METRICS[currentMetric];
     // Today shows every metric at once with no per-metric drill-in, same as Compare — but unlike
     // the old behavior, the chips stay at full readability rather than dimmed: Today always runs
@@ -3772,8 +4557,39 @@
     btn.addEventListener("click", () => setTimeframe(btn.dataset.tf));
   });
 
-  document.querySelectorAll(".view-toggle .w3-button").forEach(btn => {
-    btn.addEventListener("click", () => setView(btn.dataset.view));
+  document.querySelectorAll(".view-toggle .w3-button[data-view]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      // While the Today view is showing another date, its tab reads as that date — clicking it
+      // goes back to today.
+      if (btn.dataset.view === "today" && todayViewDate) {
+        if (todayEditMode) { todayBlockedNotice(); return; }
+        todayViewDate = null;
+      }
+      setView(btn.dataset.view);
+    });
+  });
+
+  // Calendar button next to the Today tab: native date picker, same range the Edit/Schedule
+  // dialog allows (trailing DAY_COUNT days back, CONFIG.scheduling.lookaheadDays ahead).
+  const todayDateInput = document.getElementById("todayDateInput");
+  document.getElementById("todayCalBtn").addEventListener("click", () => {
+    if (todayEditMode) { todayBlockedNotice(); return; }
+    refreshEditDateBounds();
+    todayDateInput.min = minDate;
+    todayDateInput.max = maxDate;
+    todayDateInput.value = todayViewDateStr();
+    try { todayDateInput.showPicker(); } catch (e) { todayDateInput.focus(); todayDateInput.click(); }
+  });
+  todayDateInput.addEventListener("change", async () => {
+    let d = todayDateInput.value; // "" = the picker's Clear button
+    const realToday = isoDate(new Date());
+    refreshEditDateBounds();
+    if (d && d < minDate) d = minDate;
+    if (d && d > maxDate) d = maxDate;
+    todayViewDate = (!d || d === realToday) ? null : d;
+    const locs = LOCATIONS.filter(l => selectedLocations.has(l.id));
+    await fetchLatestForLocations(locs, todayViewDateStr());
+    setView("today");
   });
 
   timeframeSelect.addEventListener("change", () => setTimeframe(timeframeSelect.value));
@@ -4691,8 +5507,14 @@
       btn.className = "loc-chip";
       btn.textContent = loc.name;
       btn.dataset.loc = loc.id;
+      btn.title = locMulti ? "" : "Show only this location";
       btn.addEventListener("click", () => {
-        if (selectedLocations.has(loc.id)) {
+        if (!locMulti) {
+          // Single-select: this location becomes the only one shown.
+          if (selectedLocations.size === 1 && selectedLocations.has(loc.id)) return; // already the only one
+          selectedLocations.clear();
+          selectedLocations.add(loc.id);
+        } else if (selectedLocations.has(loc.id)) {
           if (selectedLocations.size === 1) return; // keep at least one location selected
           selectedLocations.delete(loc.id);
         } else {
@@ -4704,20 +5526,41 @@
       });
       locationBar.appendChild(btn);
     });
+
+    const all = document.createElement("button");
+    all.className = "loc-chip all-chip";
+    all.innerHTML = '<i class="fa fa-check-square-o"></i>'; all.setAttribute("aria-label", "All");
+    all.title = "Select every location shown";
+    all.addEventListener("click", () => {
+      const shown = LOCATIONS.filter(l => visibleAreaIds.has(l.areaId));
+      if (!shown.length) return;
+      selectedLocations.clear();
+      shown.forEach(l => selectedLocations.add(l.id));
+      syncSelectionUI();
+      saveUIState();
+      render();
+    });
+    locationBar.appendChild(all);
   }
 
   function renderAreaBar() {
-    areaBar.querySelectorAll(".area-chip").forEach(el => el.remove());
+    areaBar.querySelectorAll(".area-chip, .all-chip").forEach(el => el.remove());
     AREAS.forEach(area => {
       const btn = document.createElement("button");
       btn.className = "loc-chip area-chip";
       btn.textContent = area.name;
       btn.dataset.area = area.id;
-      btn.title = visibleAreaIds.has(area.id) ? "Hide this area from GROUP" : "Show this area in GROUP";
+      btn.title = !areaMulti ? "Show only this area"
+        : visibleAreaIds.has(area.id) ? "Hide this area from GROUP" : "Show this area in GROUP";
       btn.addEventListener("click", () => {
         const locsInArea = LOCATIONS.filter(l => l.areaId === area.id).map(l => l.id);
         if (!locsInArea.length) return;
-        if (visibleAreaIds.has(area.id)) {
+        if (!areaMulti) {
+          // Single-select: this area becomes the only one shown, with all its locations selected.
+          if (visibleAreaIds.size === 1 && visibleAreaIds.has(area.id)) return; // already the only one
+          visibleAreaIds.clear(); visibleAreaIds.add(area.id);
+          selectedLocations.clear(); locsInArea.forEach(id => selectedLocations.add(id));
+        } else if (visibleAreaIds.has(area.id)) {
           // Hide it — and deselect its locations too, so a hidden area can't silently keep
           // feeding the charts from somewhere you can no longer see.
           if (visibleAreaIds.size === 1) return; // keep at least one area visible
@@ -4740,7 +5583,41 @@
       });
       areaBar.appendChild(btn);
     });
+
+    const all = document.createElement("button");
+    all.className = "loc-chip all-chip";
+    all.innerHTML = '<i class="fa fa-check-square-o"></i>'; all.setAttribute("aria-label", "All");
+    all.title = "Show every area, with all their locations";
+    all.addEventListener("click", () => {
+      AREAS.forEach(a => visibleAreaIds.add(a.id));
+      selectedLocations.clear();
+      LOCATIONS.forEach(l => selectedLocations.add(l.id));
+      renderLocationBar();
+      renderAreaBar();
+      syncSelectionUI();
+      saveUIState();
+      render();
+    });
+    areaBar.appendChild(all);
   }
+
+  const areaMultiBox = document.getElementById("areaMulti");
+  areaMultiBox.checked = areaMulti;
+  areaMultiBox.addEventListener("change", () => {
+    areaMulti = areaMultiBox.checked;
+    renderAreaBar(); // refresh chip tooltips for the new mode; the current selection is left as-is
+    syncSelectionUI(); // renderAreaBar rebuilds the chips un-highlighted — restore which ones are active
+    saveUIState();
+  });
+
+  const locMultiBox = document.getElementById("locMulti");
+  locMultiBox.checked = locMulti;
+  locMultiBox.addEventListener("change", () => {
+    locMulti = locMultiBox.checked;
+    renderLocationBar(); // refresh chip tooltips for the new mode; the current selection is left as-is
+    syncSelectionUI();   // renderLocationBar rebuilds the chips un-highlighted — restore which ones are active
+    saveUIState();
+  });
 
   renderLocationBar();
   renderAreaBar();
@@ -4782,7 +5659,9 @@
   const INPUT_FIELDS = [
     { key: "done",        label: "Done",        step: 1,  min: 0, max: 100000,  group: "actual" },
     { key: "scrap",       label: "Scrap",       step: 1,  min: 0, max: 100000,  group: "actual" },
+    { key: "hourMeter",   label: "Hour Meter",  step: 0.1, min: 0, max: 100000000, group: "actual", optional: true }, // plain reading; blank = not entered (null)
     { key: "scrapReason", label: "Reason",      type: "select", group: "actual" },
+    { key: "blocked",     label: "Blocked",     type: "checkbox", group: "actual" },
     { key: "plan",        label: "Plan",        group: "planned" }, // label/step/min/max resolved per area type — see render loop
     { key: "dollarPer",   label: "$ / Per",     step: 10, min: 0, max: 1000000, group: "planned" },
     { key: "assigned",    label: "Assigned To", type: "text", group: "planned" },
@@ -4801,7 +5680,10 @@
     editTableBody.querySelectorAll(".edit-input").forEach(input => {
       const field = INPUT_FIELDS.find(f => f.key === input.dataset.field);
       const isTextual = input.tagName === "SELECT" || (field && field.type === "text");
-      values[input.dataset.field] = isTextual ? input.value : (parseFloat(input.value) || 0);
+      values[input.dataset.field] = input.type === "checkbox" ? input.checked
+        : isTextual ? input.value
+        : (field && field.optional && input.value === "") ? null
+        : (parseFloat(input.value) || 0);
     });
     return values;
   }
@@ -4904,6 +5786,9 @@
           .concat(reasons.map(r => `<option value="${r.code}" ${r.code === current ? "selected" : ""}>${r.text}</option>`));
         inputHtml = `<select class="edit-input" data-field="${f.key}" style="width:100%; text-align:left;">${options.join("")}</select>`;
         row.innerHTML = `<td colspan="2">${f.label}<br>${inputHtml}</td>`;
+      } else if (f.type === "checkbox") {
+        inputHtml = `<input type="checkbox" class="edit-input takt-check" data-field="${f.key}" ${record[f.key] ? "checked" : ""}>`;
+        row.innerHTML = `<td>${f.label}</td><td style="text-align:right;">${inputHtml}</td>`;
       } else if (f.type === "text") {
         const current = record[f.key] || "";
         inputHtml = `<input type="text" class="edit-input" data-field="${f.key}" value="${current}" placeholder="Unassigned" style="width:100%; text-align:left;">`;
@@ -4925,7 +5810,7 @@
           label = pf.label; step = pf.step; min = pf.min; max = pf.max;
         }
         inputHtml = `<input type="number" class="edit-input" data-field="${f.key}"
-                 min="${min}" max="${max}" step="${step}" value="${record[f.key]}">`;
+                 min="${min}" max="${max}" step="${step}" value="${record[f.key] == null ? "" : record[f.key]}"${f.optional ? ' placeholder="—"' : ""}>`;
         row.innerHTML = `
         <td>${label}</td>
         <td style="text-align:right;">${inputHtml}</td>`;
@@ -4947,16 +5832,14 @@
   }
 
   // Same dialog underneath either way (see populateEditTable's editIsFuture branch for why
-  // that's fine), but Edit and Schedule are two distinct entry points/buttons in the header —
-  // Edit opens on today, Schedule opens a day ahead — so they can be shown or hidden
-  // independently by role later (an operator vs. a scheduler) without restructuring the modal.
+  // that's fine). Scheduling ahead now happens in the Today view (calendar button next to the Today
+  // tab), so this dialog is only reachable for dates up to today (see editChip below).
   function openEditModal(opts) {
     opts = opts || {};
     refreshEditDateBounds(); // pick up the real current date, even if this tab's been open since before midnight
     // Two different use cases, two different ranges: Edit records what already happened (never
-    // a future date — see editChip below, which caps this to today), Schedule assigns what's
-    // coming (never a past date — see scheduleChip, which raises this to today). Each passes its
-    // own override; only the shared trailing-14-day/lookahead defaults apply when neither does.
+    // a future date — see editChip below, which caps this to today); the shared trailing-14-day/lookahead
+    // defaults apply when no override is passed.
     editDateInput.min = opts.minDate || minDate;
     editDateInput.max = opts.maxDate || maxDate;
     editDateInput.value = opts.initialDate || isoDate(new Date());
@@ -4977,24 +5860,14 @@
   document.getElementById("editChip").addEventListener("click", () => {
     openEditModal({ maxDate: isoDate(new Date()) }); // Edit records what happened — never a future date
   });
-  document.getElementById("scheduleChip").addEventListener("click", () => {
-    const todayStr = isoDate(new Date());
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    openEditModal({
-      initialDate: isoDate(tomorrow),
-      minDate: todayStr, // scheduling ahead — a day that's already passed isn't pickable here
-      title: "Schedule upcoming work"
-    });
-  });
   document.getElementById("editClose").addEventListener("click", closeEditModal);
   document.getElementById("editCancel").addEventListener("click", closeEditModal);
   editModal.addEventListener("click", (e) => { if (e.target === editModal) closeEditModal(); });
 
   editDateInput.addEventListener("change", () => {
     // Clamped against the INPUT's own current min/max attributes, not the shared minDate/maxDate
-    // variables — Schedule tightens min to today (see scheduleChip above) while Edit doesn't, so
-    // the two need to clamp differently depending on which one opened this same dialog.
+    // variables — the opener (editChip) caps max to today, which is tighter than the shared lookahead
+    // default, so the clamp has to read the input itself.
     let d = editDateInput.value;
     if (d < editDateInput.min) d = editDateInput.min;
     if (d > editDateInput.max) d = editDateInput.max;
@@ -5069,7 +5942,7 @@
     // Keep the Today view current without disturbing anyone mid-edit — paused entirely while
     // todayEditMode is on (see the Edit toggle, above).
     if (currentView !== "today" || todayEditMode) return;
-    const todayDate = dailyDates[dailyDates.length - 1];
+    const todayDate = todayViewDateStr();
     const locs = LOCATIONS.filter(l => selectedLocations.has(l.id));
     await fetchLatestForLocations(locs, todayDate);
     if (currentView === "today" && !todayEditMode) renderTodayView(); // re-check: state may have changed during the fetch
@@ -5149,6 +6022,166 @@
       location.reload();
     }
   });
+
+  // ---------- Dev tool: generate Areas/Locations from FACILITY_LAYOUT (?generate=true only) ----------
+  // One Area per bay, one Location per cell, using the exact same defaults (benchmarks/scrap
+  // reasons/operating days/targets) the hand-written demo areas use, and the exact same
+  // apply-path addLocation() uses (DataSource.loadOne + saveSettings) — so "Apply" produces real,
+  // persisted seed data, not a preview. Never shown without the URL flag, so it can't surface to
+  // a customer by accident. Also prints copy-paste-ready code for replacing the hardcoded
+  // AREAS/LOCATIONS constants themselves, for whenever a layout graduates from "tried it live" to
+  // "this is the new default."
+  // ?generate=true is a data-mutating dev tool — it must never be reachable on a real deployment
+  // just because someone guessed or shared the URL with that flag on it. Gated to file:// (opened
+  // straight off disk) and localhost/127.0.0.1/::1 (a local dev server) only; anywhere else, the
+  // flag is silently ignored and the panel never appears, no matter what's in the query string.
+  function isLocalOrigin() {
+    if (location.protocol === "file:") return true;
+    const h = location.hostname;
+    return h === "localhost" || h === "127.0.0.1" || h === "::1" || h.endsWith(".localhost");
+  }
+  function isGenerateMode() {
+    try { return isLocalOrigin() && new URLSearchParams(location.search).get("generate") === "true"; } catch (e) { return false; }
+  }
+
+  // One line per bay: "<bay id or name>: code1, code2, code3…" — position in the list maps onto
+  // that bay's auto-numbered cells in the exact same order facGridFor/facComputeCells assigns
+  // them (1st code -> ".01", 2nd -> ".02", …), so there's no separate id to type or look up per
+  // cell. A bay name that doesn't match anything, or a line with no colon, is just skipped —
+  // harmless rather than needing to be detected/stripped specially. Extra codes past a bay's
+  // count are ignored (no cell to attach to); fewer codes than the count just leaves the rest on
+  // their positional placeholder.
+  function parseRenameMap(raw) {
+    const map = new Map();
+    String(raw || "").split(/\r?\n/).forEach(line => {
+      const t = line.trim();
+      if (!t) return;
+      const colonIdx = t.indexOf(":");
+      if (colonIdx < 0) return;
+      const bayKey = t.slice(0, colonIdx).trim().toLowerCase();
+      const bay = facLayout.bays.find(b => b.id.toLowerCase() === bayKey || b.name.toLowerCase() === bayKey);
+      if (!bay) return;
+      const codes = t.slice(colonIdx + 1).split(/\t|,|;/).map(s => s.trim()).filter(Boolean);
+      codes.forEach((code, i) => { map.set(bay.id + "." + facPad2(i + 1), code); });
+    });
+    return map;
+  }
+
+  function buildFacilitySeed(renameMap) {
+    facComputeCells(); // pure — just (re)builds facCells/facCellMap from FACILITY_LAYOUT, no DOM
+    const genAreas = facLayout.bays.map(b => ({
+      id: b.id, name: b.name, type: "hrs",
+      benchmarks: { ...DEFAULT_BENCHMARKS },
+      scrapReasons: DEFAULT_SCRAP_REASONS.map(r => ({ ...r })),
+      targets: { ...DEFAULT_LOCATION_TARGETS },
+      operatingDays: [...OPERATING_DAYS_DEFAULT]
+    }));
+    // Location id is a permanent slug off the positional cell id ("b09-02") — that's the join key
+    // the facility dot, Today table, etc. all key off, and it never changes. name is what's shown
+    // and (in API mode) sent over the wire: the real code from renameMap when one was supplied
+    // for this cell, otherwise the positional id itself as a placeholder ("B09.02"). Renaming
+    // later is just editing name — id staying fixed is the entire "mapping layer."
+    const genLocations = facCells.map(c => ({
+      id: c.id.toLowerCase().replace(/\./g, "-"),
+      name: (renameMap && renameMap.get(c.id)) || c.id,
+      areaId: c.bayId
+    }));
+    return { genAreas, genLocations };
+  }
+
+  // Always the full "paste this in place of the hardcoded arrays" shape — this tool now only
+  // exists to hand you code to copy onto the real server config, not to preview-seed a live
+  // session (that apply/replace/undo machinery was more complexity than this needed).
+  function facilitySeedCode(genAreas, genLocations) {
+    const areaLines = genAreas.map(a =>
+      `    { id: ${JSON.stringify(a.id)}, name: ${JSON.stringify(a.name)}, type: "hrs", benchmarks: { ...DEFAULT_BENCHMARKS }, scrapReasons: DEFAULT_SCRAP_REASONS.map(r => ({ ...r })), targets: { ...DEFAULT_LOCATION_TARGETS }, operatingDays: [...OPERATING_DAYS_DEFAULT] }`
+    ).join(",\n");
+    const locLines = genLocations.map(l =>
+      `    { id: ${JSON.stringify(l.id)}, name: ${JSON.stringify(l.name)}, areaId: ${JSON.stringify(l.areaId)} }`
+    ).join(",\n");
+    return `// ---- Generated from FACILITY_LAYOUT by the ?generate=true dev tool — review before using ----\n`
+      + `const AREAS = [\n${areaLines}\n];\n\n`
+      + `const LOCATIONS = [\n${locLines}\n];`;
+  }
+
+  if (isGenerateMode()) {
+    const panel = document.getElementById("genPanel");
+    panel.classList.add("on");
+    const copyBtn = document.getElementById("genCopyBtn");
+    const codeBox = document.getElementById("genCode");
+    const summary = document.getElementById("genSummary");
+    const layoutInput = document.getElementById("genLayoutInput");
+    const layoutStatus = document.getElementById("genLayoutStatus");
+    const loadLayoutBtn = document.getElementById("genLoadLayoutBtn");
+    const renameInput = document.getElementById("genRenameInput");
+
+    // The code box always shows a live translation of whichever layout is currently loaded (plus
+    // any Step 2 renames) — there's nothing to separately "generate," it just reflects current
+    // state. This tool only hands you code to copy onto the real server config — it no longer
+    // touches this session's own data (that apply/replace/undo path was dropped; ?generate=true
+    // is file://-or-localhost only now anyway, see isGenerateMode, so there's no "live demo
+    // session" to seed here).
+    function refreshPreview() {
+      const renameMap = parseRenameMap(renameInput.value);
+      const { genAreas, genLocations } = buildFacilitySeed(renameMap);
+      codeBox.value = facilitySeedCode(genAreas, genLocations);
+      const mapped = facCells.filter(c => renameMap.has(c.id)).length;
+      summary.textContent = genAreas.length + " areas, " + genLocations.length + " locations, from “" + facLayout.facility + "”"
+        + (renameMap.size ? " — " + mapped + " of " + genLocations.length + " renamed to real codes" : "");
+      // Also drives the live Facility tab's own tooltip/selection panel (facLabel) — otherwise
+      // this box only ever fed the copy-paste code, never anything actually on screen.
+      facRenameMap = renameMap;
+      facHoverId = null; // invalidate the tooltip's "only recompute text when the hovered id changes" cache
+      if (facSelId) facSelect(facSelId); // refresh the already-open selection panel, if any, with the new label
+    }
+    // Debounced so retyping/pasting a long rename list doesn't recompute 195 records per
+    // keystroke — a couple hundred ms of lag is unnoticeable for a paste, but a raw "input"
+    // listener firing on every character would not be.
+    let renameDebounce = null;
+    renameInput.addEventListener("input", () => {
+      clearTimeout(renameDebounce);
+      renameDebounce = setTimeout(refreshPreview, 200);
+    });
+    function layoutStatusText() {
+      layoutStatus.textContent = facEnabled
+        ? "Currently using the layout baked into this file: “" + facLayout.facility + "” (" + facLayout.bays.length + " bays)."
+        : "No layout in this file (FACILITY_LAYOUT is null, so the Facility tab is hidden) — paste one above to try it.";
+    }
+    refreshPreview();
+    layoutStatusText();
+
+    // Paste a fresh export from the builder tool and load it straight into this running page —
+    // no round-trip through a file edit needed just to try a layout out. Swaps FACILITY_LAYOUT in
+    // place (see replaceFacilityLayout) and rebuilds the floor plan if the Facility tab has
+    // already been opened this session.
+    loadLayoutBtn.addEventListener("click", () => {
+      const raw = layoutInput.value.trim();
+      if (!raw) { layoutStatus.textContent = "Paste a layout above first — or leave it empty to keep using the one already in this file."; return; }
+      let parsed;
+      try { parsed = JSON.parse(raw); }
+      catch (e) { layoutStatus.textContent = "That isn't valid JSON — make sure the whole export got copied."; return; }
+      if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.bays) || !Array.isArray(parsed.outline) || typeof parsed.aspect !== "number") {
+        layoutStatus.textContent = "Doesn't look like a facility layout export — expected facility/aspect/outline/bays.";
+        return;
+      }
+      replaceFacilityLayout(parsed);
+      layoutStatus.textContent = "Loaded — now using “" + (parsed.facility || "Untitled") + "” (" + parsed.bays.length
+        + " bays). Open the Facility tab to see it.";
+      refreshPreview();
+    });
+
+    copyBtn.addEventListener("click", async () => {
+      codeBox.select();
+      try {
+        await navigator.clipboard.writeText(codeBox.value);
+        copyBtn.textContent = "Copied!";
+      } catch (e) {
+        document.execCommand("copy");
+        copyBtn.textContent = "Copied!";
+      }
+      setTimeout(() => { copyBtn.textContent = "Copy code"; }, 1500);
+    });
+  }
 </script>
 
 </body>
